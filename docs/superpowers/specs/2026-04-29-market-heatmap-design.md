@@ -85,15 +85,19 @@ class RawMention:
 ```yaml
 A股:
   collectors: [xueqiu, eastmoney, tonghuashun, weibo_finance, baidu_index]
+  platform_weights: {xueqiu: 0.30, eastmoney: 0.25, tonghuashun: 0.20, weibo_finance: 0.15, baidu_index: 0.10}
   symbol_pattern: "中文名称 / 6位代码"
 港股:
   collectors: [xueqiu_hk, futu, eastmoney_hk, weibo_finance]
+  platform_weights: {xueqiu_hk: 0.30, futu: 0.30, eastmoney_hk: 0.25, weibo_finance: 0.15}
   symbol_pattern: "5位代码 / 中文名称"
 美股:
   collectors: [reddit_wsb, reddit_stocks, twitter_cashtag, stocktwits, google_trends]
+  platform_weights: {reddit_wsb: 0.25, reddit_stocks: 0.20, twitter_cashtag: 0.25, stocktwits: 0.20, google_trends: 0.10}
   symbol_pattern: "ticker symbol"
 币圈:
   collectors: [twitter_crypto, reddit_crypto, coingecko, telegram_crypto, weibo_crypto]
+  platform_weights: {twitter_crypto: 0.30, reddit_crypto: 0.20, coingecko: 0.20, telegram_crypto: 0.15, weibo_crypto: 0.15}
   symbol_pattern: "token symbol"
 ```
 
@@ -103,6 +107,7 @@ A股:
 - 每个采集器内置频率限制（rate limiter），避免被封
 - 失败重试 3 次，单个平台失败不影响其他平台
 - 标的名称标准化：用 symbol_mapping 表统一别名为标准名称
+- weibo_finance 采集器被 A 股和港股共用，内部根据 market 参数筛选不同话题标签
 
 ## 6. 热度分析引擎
 
@@ -119,11 +124,11 @@ H_score = w1·P + w2·C + w3·L + w4·S + w5·|Sent| + w6·K
 | L | 点赞数（归一化） | 0.15 |
 | S | 转发数（归一化） | 0.15 |
 | \|Sent\| | 情绪强度（取绝对值） | 0.10 |
-| K | KOL 加权因子（KOL 帖子 ×3） | 0.15 |
+| K | KOL 比率（kol_mention_count / total_post_count，归一化后 ×3 放大） | 0.15 |
 
 - 所有原始指标按当日全市场 min-max 归一化到 [0, 1]
 - 权重可在 `config/weights.yaml` 中调整
-- 多平台数据按平台权重加权合并
+- 多平台数据合并方式：同一标的在不同平台的 RawMention 先按平台权重（`config/markets.yaml` 中定义，如雪球对 A 股权重 0.35、东方财富 0.30 等）加权求和，再输入热度公式
 
 ### 6.2 日环比计算
 
@@ -329,6 +334,9 @@ market-heatmap/
 ```bash
 # A股：每个交易日 20:00 运行（收盘后留充分时间让讨论沉淀）
 0 20 * * 1-5 cd /path/to/market-heatmap && python main.py --market A股
+
+# 港股：每个交易日 20:00 运行（与 A 股同时段）
+0 20 * * 1-5 cd /path/to/market-heatmap && python main.py --market 港股
 
 # 美股：每个交易日北京时间 10:00 运行（美股收盘后）
 0 10 * * 2-6 cd /path/to/market-heatmap && python main.py --market 美股
