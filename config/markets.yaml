@@ -1,0 +1,31 @@
+A股:
+  collectors: [xueqiu, eastmoney, tonghuashun, weibo_finance, baidu_index]
+  platform_weights:
+    xueqiu: 0.30
+    eastmoney: 0.25
+    tonghuashun: 0.20
+    weibo_finance: 0.15
+    baidu_index: 0.10
+港股:
+  collectors: [xueqiu_hk, futu, eastmoney_hk, weibo_finance]
+  platform_weights:
+    xueqiu_hk: 0.30
+    futu: 0.30
+    eastmoney_hk: 0.25
+    weibo_finance: 0.15
+美股:
+  collectors: [reddit_wsb, reddit_stocks, twitter_cashtag, stocktwits, google_trends]
+  platform_weights:
+    reddit_wsb: 0.25
+    reddit_stocks: 0.20
+    twitter_cashtag: 0.25
+    stocktwits: 0.20
+    google_trends: 0.10
+币圈:
+  collectors: [twitter_crypto, reddit_crypto, coingecko, telegram_crypto, weibo_crypto]
+  platform_weights:
+    twitter_crypto: 0.30
+    reddit_crypto: 0.20
+    coingecko: 0.20
+    telegram_crypto: 0.15
+    weibo_crypto: 0.15
