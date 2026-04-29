@@ -1,0 +1,26 @@
+from __future__ import annotations
+
+import typer
+
+from sentinel.app import build_application
+from sentinel.config import AppSettings
+from sentinel.domain.models import Market
+
+app = typer.Typer(no_args_is_help=True)
+
+
+@app.command()
+def run(
+    market: Market = typer.Option(..., "--market"),
+    report: str | None = typer.Option(None, "--report"),
+    time: str | None = typer.Option(None, "--time"),
+) -> None:
+    del report, time
+    settings = AppSettings()
+    application = build_application(settings)
+    snapshots = application.run_market(market=market)
+    typer.echo(f"stored {len(snapshots)} snapshot for {market.value}")
+
+
+if __name__ == "__main__":
+    app()
