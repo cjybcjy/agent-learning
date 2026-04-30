@@ -88,18 +88,30 @@ class LarkBitablePublisher:
             "base", "+base-create",
             "--name", name,
         ])
-        app_token = result.get("app_token") or result.get("data", {}).get("app_token")
+        # Response: {"ok": true, "data": {"base": {"base_token": "..."}}}
+        data = result.get("data", {})
+        app_token = (
+            data.get("base", {}).get("base_token")
+            or data.get("app_token")
+            or result.get("app_token")
+        )
         if not app_token:
             raise LarkCliError(f"Failed to create base: {result}")
 
         # Create a table with the required fields
         table_result = run_lark_cli([
             "base", "+table-create",
-            "--app-token", app_token,
+            "--base-token", app_token,
             "--name", "异动记录",
             "--fields", _table_fields_json(),
         ])
-        table_id = table_result.get("table_id") or table_result.get("data", {}).get("table_id")
+        # Response: {"ok": true, "data": {"table": {"id": "tblXXX", ...}}}
+        table_data = table_result.get("data", {})
+        table_id = (
+            table_data.get("table", {}).get("id")
+            or table_data.get("table_id")
+            or table_result.get("table_id")
+        )
         if not table_id:
             raise LarkCliError(f"Failed to create table: {table_result}")
 
@@ -109,14 +121,15 @@ class LarkBitablePublisher:
         """Batch-append snapshot records to the Bitable table."""
         import json
 
-        records = [_snapshot_to_fields(s) for s in snapshots]
-        records_json = json.dumps(records, ensure_ascii=False)
+        fields_list = list(_snapshot_to_fields(snapshots[0]).keys())
+        rows = [list(_snapshot_to_fields(s).values()) for s in snapshots]
+        batch_json = json.dumps({"fields": fields_list, "rows": rows}, ensure_ascii=False)
 
         run_lark_cli([
             "base", "+record-batch-create",
-            "--app-token", app_token,
+            "--base-token", app_token,
             "--table-id", table_id,
-            "--records", records_json,
+            "--json", batch_json,
         ])
 
 
@@ -131,7 +144,7 @@ def _table_fields_json() -> str:
         {"field_name": "情绪极性", "type": "Text"},
         {"field_name": "综合情绪得分", "type": "Number"},
         {"field_name": "环比变动", "type": "Number"},
-        {"field_name": "预警类型", "type": "SingleSelect"},
+        {"field_name": "预警类型", "type": "Text"},
         {"field_name": "热度来源", "type": "Text"},
         {"field_name": "排名", "type": "Number"},
     ]

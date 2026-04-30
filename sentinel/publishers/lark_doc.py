@@ -116,7 +116,11 @@ class LarkDocPublisher:
             "--api-version", "v2",
             "--content", content,
         ])
-        doc_token = result.get("document_id") or result.get("data", {}).get("document_id")
+        # Response: {"ok": true, "data": {"document": {"document_id": "..."}}}
+        doc_token = (
+            result.get("data", {}).get("document", {}).get("document_id")
+            or result.get("document_id")
+        )
         if not doc_token:
             raise LarkCliError(f"Failed to create doc: {result}")
         return doc_token

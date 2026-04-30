@@ -18,7 +18,7 @@ def run_lark_cli(args: list[str], *, timeout: int = 30) -> dict:
 
     Raises LarkCliError on failure.
     """
-    cmd = ["lark-cli", *args, "--output", "json"]
+    cmd = ["lark-cli", *args]
     logger.debug("lark-cli command: %s", " ".join(cmd))
     try:
         result = subprocess.run(

@@ -15,11 +15,13 @@ def run(
     report: str | None = typer.Option(None, "--report"),
     time: str | None = typer.Option(None, "--time"),
     publish: bool = typer.Option(False, "--publish", help="Push results to Feishu Bitable + Doc"),
+    collectors: str | None = typer.Option(None, "--collectors", help="Comma-separated collector keys (overrides markets.yaml)"),
 ) -> None:
     del report, time
     settings = AppSettings()
     application = build_application(settings)
-    snapshots = application.run_market(market=market)
+    collector_keys = [c.strip() for c in collectors.split(",")] if collectors else None
+    snapshots = application.run_market(market=market, collector_keys=collector_keys)
     typer.echo(f"collected {len(snapshots)} ranked snapshot for {market.value}")
     for s in snapshots:
         direction = "bullish" if s.directed_heat > 0 else ("bearish" if s.directed_heat < 0 else "neutral")
