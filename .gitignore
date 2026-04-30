@@ -1,0 +1,25 @@
+# Model files (large, downloaded at runtime)
+models/finbert_en/model.onnx
+models/finbert_en/*.bin
+models/finbert_en/*.safetensors
+models/finbert_zh/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+
+# DuckDB
+data/*.duckdb
+
+# Environments
+.venv/
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
