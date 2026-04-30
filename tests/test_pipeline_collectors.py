@@ -41,7 +41,8 @@ def test_pipeline_collects_from_registered_collectors(tmp_path) -> None:
     market_config = {"A股": {"collectors": ["synthetic"]}}
     app = SentinelApplication(repository=repository, runner=runner, market_config=market_config)
 
-    mentions = app.run_market(market=Market.A_SHARE, collector_keys=["synthetic"])
+    snapshots = app.run_market(market=Market.A_SHARE, collector_keys=["synthetic"])
 
-    assert len(mentions) == 1
-    assert mentions[0].symbol == "600519"
+    assert len(snapshots) == 1
+    assert snapshots[0].symbol == "600519"
+    assert snapshots[0].base_heat > 0
