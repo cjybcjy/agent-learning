@@ -18,13 +18,14 @@ async def run_daily_aggregation(store: Store, date: str,
     if not today_counts:
         return []
 
-    # Stage A：按 mention 取 top N
+    # market_avg 必须基于全市场（而非仅 Stage A 候选），否则平均值被热门标的抬高、β 普遍偏低。
+    today_weighted_all = {sym: weighted_score(cnt, 0) for sym, cnt in today_counts.items()}
+    market_avg = sum(today_weighted_all.values()) / max(1, len(today_weighted_all))
+
+    # Stage A：按 mention 取 top N 进入候选池
     sorted_today = sorted(today_counts.items(), key=lambda kv: kv[1], reverse=True)
     candidates = sorted_today[:stage_a_top_n]
-
-    # Stage B：加权分（v1 interactions=0，回退为 mention）
-    today_weighted = {sym: weighted_score(cnt, 0) for sym, cnt in candidates}
-    market_avg = sum(today_weighted.values()) / max(1, len(today_weighted))
+    today_weighted = {sym: today_weighted_all[sym] for sym, _ in candidates}
 
     yesterday = _prev_day(date)
     yesterday_counts = await store.daily_mention_counts(yesterday)
@@ -38,12 +39,15 @@ async def run_daily_aggregation(store: Store, date: str,
                                mention=today_counts[sym], weighted=w_today))
 
     top = select_top(cands, alpha_min=alpha_min, beta_min=beta_min, top_n=stage_b_top_n)
+    qualified_syms = {c.symbol for c in top}
 
     for c in cands:
+        # 仅入选者持久化 composite；未达标者写 NULL，避免 0 被误读为"已计算且为零"。
+        composite_val = c.composite if c.symbol in qualified_syms else None
         await store.upsert_daily_score(
             symbol=c.symbol, date=date, mention_count=c.mention,
             weighted_score=c.weighted,
             alpha=(None if c.alpha == math.inf else c.alpha),
-            beta=c.beta, composite=c.composite,
+            beta=c.beta, composite=composite_val,
         )
     return top

@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from datetime import datetime, timezone
 from heatmap.store.dao import Store, RawMessage, Mention
@@ -28,3 +30,20 @@ async def test_insert_mentions_and_count(store):
         matched_alias="DOGE", is_ambiguous=False, confidence=1.0)])
     counts = await store.daily_mention_counts("2026-04-30")
     assert counts["DOGE"] == 1
+
+
+async def test_concurrent_inserts_preserve_message_ids(store):
+    """多 collector 并发写入时，lastrowid 必须与该次 insert 对应（验证写锁）。"""
+    async def one(symbol: str, idx: int):
+        mid = await store.insert_message(RawMessage(
+            platform="telegram", channel=f"@c{idx}", author_id=str(idx),
+            content=symbol, posted_at=datetime(2026,4,30,tzinfo=timezone.utc),
+            fetched_at=datetime(2026,4,30,tzinfo=timezone.utc),
+        ))
+        await store.insert_mentions([Mention(mid, symbol, symbol, False, 1.0)])
+        return mid
+
+    ids = await asyncio.gather(*[one(f"S{i}", i) for i in range(50)])
+    assert len(set(ids)) == 50  # all unique, no collisions
+    counts = await store.daily_mention_counts("2026-04-30")
+    assert sum(counts.values()) == 50

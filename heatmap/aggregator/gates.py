@@ -29,5 +29,10 @@ def select_top(cands: list[Candidate], alpha_min: float, beta_min: float, top_n:
     qualified = [c for c in cands if c.alpha >= alpha_min and c.beta >= beta_min]
     for c in qualified:
         c.composite = compose(c.alpha, c.beta)
-    qualified.sort(key=lambda x: x.composite, reverse=True)
-    return qualified[:top_n]
+    # 冷启动 NEW (alpha=inf) 单独排：按 beta 降序置顶；常规项按 composite 降序紧随其后。
+    # 这样可避免 NEW 的 composite=log10(1+β) 与常规 α·log10(1+β) 同台比较被压到底。
+    new_items = [c for c in qualified if c.alpha == math.inf]
+    regular = [c for c in qualified if c.alpha != math.inf]
+    new_items.sort(key=lambda x: x.beta, reverse=True)
+    regular.sort(key=lambda x: x.composite, reverse=True)
+    return (new_items + regular)[:top_n]
