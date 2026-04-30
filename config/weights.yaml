@@ -1,6 +1,0 @@
-base_heat:
-  posts: 0.35
-  comments: 0.30
-  likes: 0.20
-  shares: 0.15
-kol_multiplier: 3.0
