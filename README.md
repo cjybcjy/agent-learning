@@ -10,6 +10,25 @@ This phase provides:
 - DuckDB schema bootstrap
 - Typer CLI command that stores one synthetic snapshot
 
+## Phase 2 Scope
+
+This phase adds:
+- Collector plugin system with `BaseCollector` ABC and `CollectorRegistry`
+- Async HTTP adapter (`aiohttp`)
+- Representative market collectors: `xueqiu` (A shares), `reddit_stocks` (US), `coingecko` (crypto)
+- `StaticCollector` for deterministic local testing
+- Pipeline replaced with async collector execution
+
+## Collector Development
+
+Representative collectors included:
+- `xueqiu` for A shares
+- `reddit_stocks` for US equities
+- `coingecko` for crypto
+- `synthetic` for deterministic local testing
+
+Collector modules expose parser helpers so tests can validate payload handling without making live network calls.
+
 ## Setup
 
 ```bash
@@ -27,7 +46,7 @@ python main.py --market A股
 Expected output:
 
 ```text
-stored 1 snapshot for A股
+collected 1 mention for A股
 ```
 
 ## Test
