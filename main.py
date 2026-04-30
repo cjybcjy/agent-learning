@@ -18,8 +18,8 @@ def run(
     del report, time
     settings = AppSettings()
     application = build_application(settings)
-    snapshots = application.run_market(market=market)
-    typer.echo(f"stored {len(snapshots)} snapshot for {market.value}")
+    mentions = application.run_market(market=market)
+    typer.echo(f"collected {len(mentions)} mention for {market.value}")
 
 
 if __name__ == "__main__":
