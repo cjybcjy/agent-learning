@@ -11,6 +11,28 @@ class HeatMetricRepository:
     def bootstrap(self) -> None:
         self.database.bootstrap()
 
+    def get_previous_heats(self, market: Market) -> dict[str, float]:
+        """Return the most recent directed_heat per symbol for a given market.
+
+        Used to compute period-over-period Δ%.
+        """
+        con = self.database.connect()
+        try:
+            rows = con.execute(
+                """
+                SELECT symbol, directed_heat
+                FROM heat_metrics
+                WHERE market = ?
+                  AND timestamp = (
+                      SELECT MAX(timestamp) FROM heat_metrics WHERE market = ?
+                  )
+                """,
+                [market.value, market.value],
+            ).fetchall()
+        finally:
+            con.close()
+        return {row[0]: float(row[1]) for row in rows}
+
     def upsert_snapshots(self, snapshots: list[HeatSnapshot]) -> None:
         if not snapshots:
             return

@@ -27,7 +27,7 @@ class RunPipelineService:
         self.weights = weights or WeightsConfig()
         self.sentiment = sentiment_analyzer or NullSentimentAnalyzer()
 
-    def run_market(self, market: Market, collector_keys: list[str]) -> list[HeatSnapshot]:
+    def run_market(self, market: Market, collector_keys: list[str], previous_heats: dict[str, float] | None = None) -> list[HeatSnapshot]:
         timestamp = datetime.now(tz=timezone.utc).replace(tzinfo=None)
         raw = asyncio.run(self._collect_market(market, collector_keys, timestamp))
         clean = filter_spam(raw)
@@ -36,6 +36,14 @@ class RunPipelineService:
         sentiment_scores = self._compute_sentiment(clean)
 
         snapshots = compute_heat(clean, self.weights, timestamp, sentiment_scores=sentiment_scores)
+
+        # Compute Δ% from previous period
+        if previous_heats:
+            for s in snapshots:
+                prev = previous_heats.get(s.symbol)
+                if prev is not None and abs(prev) > 1e-9:
+                    s.change_pct = round((abs(s.directed_heat) - abs(prev)) / abs(prev) * 100, 2)
+
         ranked = rank_snapshots(snapshots, top_n=10)
         return ranked
 

@@ -26,7 +26,8 @@ class SentinelApplication:
     def run_market(self, market: Market, collector_keys: list[str] | None = None) -> list[HeatSnapshot]:
         self.repository.bootstrap()
         keys = collector_keys or get_market_collectors(self.market_config, market.value)
-        snapshots = self.runner.run_market(market=market, collector_keys=keys)
+        previous_heats = self.repository.get_previous_heats(market)
+        snapshots = self.runner.run_market(market=market, collector_keys=keys, previous_heats=previous_heats)
         self.repository.upsert_snapshots(snapshots)
         return snapshots
 
