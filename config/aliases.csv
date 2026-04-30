@@ -1,0 +1,5 @@
+symbol,alias,is_ambiguous,source
+BTC,比特币,false,seed
+BTC,btc,false,seed
+DOGE,狗狗,false,seed
+DOGE,doge,false,seed

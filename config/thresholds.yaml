@@ -1,0 +1,4 @@
+stage_a_top_n: 50
+stage_b_top_n: 10
+alpha_min: 0.5
+beta_min: 1.5
