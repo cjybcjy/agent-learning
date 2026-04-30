@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from pathlib import Path
 
 from sentinel.analyzers import WeightsConfig
+from sentinel.analyzers.sentiment import NullSentimentAnalyzer, SentimentAnalyzer
 from sentinel.collectors.registry import CollectorRegistry
 from sentinel.collectors.synthetic import build_default_registry
 from sentinel.config import AppSettings, get_market_collectors, load_market_config, load_weights_config
@@ -10,6 +13,8 @@ from sentinel.domain.models import HeatSnapshot, Market
 from sentinel.services.run_pipeline import RunPipelineService
 from sentinel.storage.db import Database
 from sentinel.storage.repository import HeatMetricRepository
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -39,6 +44,16 @@ def build_application(settings: AppSettings) -> SentinelApplication:
         shares=float(base_heat.get("shares", 0.15)),
         kol_multiplier=float(weights_raw.get("kol_multiplier", 3.0)),
     )
-    runner = RunPipelineService(registry, weights)
+
+    # Load sentiment model if configured
+    model_dir = settings.resolved_config_dir.parent / "models" / "finbert_en"
+    if model_dir.exists() and (model_dir / "model.onnx").exists():
+        logger.info("Loading FinBERT model from %s", model_dir)
+        sentiment_analyzer: SentimentAnalyzer | NullSentimentAnalyzer = SentimentAnalyzer(model_dir)
+    else:
+        logger.info("No FinBERT model found, using neutral sentiment")
+        sentiment_analyzer = NullSentimentAnalyzer()
+
+    runner = RunPipelineService(registry, weights, sentiment_analyzer)
     market_config = load_market_config(settings.resolved_config_dir / "markets.yaml")
     return SentinelApplication(repository=repository, runner=runner, market_config=market_config)

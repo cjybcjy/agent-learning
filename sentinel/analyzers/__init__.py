@@ -21,10 +21,12 @@ def compute_heat(
     weights: WeightsConfig,
     timestamp: datetime,
     sentiment_score: float = 0.0,
+    sentiment_scores: dict[str, float] | None = None,
 ) -> list[HeatSnapshot]:
     """Aggregate mentions per symbol and compute directed heat scores.
 
-    sentiment_score is a placeholder (0.0 = neutral) until FinBERT is integrated.
+    sentiment_scores: per-symbol scores from FinBERT (keyed by symbol).
+    sentiment_score: global fallback when per-symbol scores not available.
     """
     if not mentions:
         return []
@@ -67,7 +69,12 @@ def compute_heat(
         kol_ratio = agg.kol_mentions / agg.total_mentions if agg.total_mentions else 0
         m_kol = 1.0 + weights.kol_multiplier * kol_ratio
 
-        directed_heat = v_base * m_kol * sentiment_score if sentiment_score != 0.0 else v_base * m_kol
+        # Resolve sentiment: per-symbol overrides global fallback
+        sent = sentiment_score
+        if sentiment_scores and agg.symbol in sentiment_scores:
+            sent = sentiment_scores[agg.symbol]
+
+        directed_heat = v_base * m_kol * sent if sent != 0.0 else v_base * m_kol
 
         top_source = max(agg.platform_counts, key=agg.platform_counts.get)  # type: ignore[arg-type]
 
@@ -78,7 +85,7 @@ def compute_heat(
                 symbol=agg.symbol,
                 base_heat=round(v_base, 4),
                 kol_multiplier=round(m_kol, 4),
-                sentiment_score=sentiment_score,
+                sentiment_score=round(sent, 4),
                 directed_heat=round(directed_heat, 4),
                 change_pct=None,
                 top_source=top_source,
