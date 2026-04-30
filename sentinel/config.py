@@ -38,3 +38,11 @@ def load_market_config(path: Path) -> dict[str, dict[str, object]]:
 def load_weights_config(path: Path) -> dict[str, object]:
     with path.open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle) or {}
+
+
+def get_market_collectors(config: dict[str, dict[str, object]], market: str) -> list[str]:
+    market_section = config.get(market, {})
+    collectors = market_section.get("collectors", [])
+    if not isinstance(collectors, list):
+        return []
+    return collectors
