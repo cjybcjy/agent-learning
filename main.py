@@ -22,7 +22,8 @@ def run(
     typer.echo(f"collected {len(snapshots)} ranked snapshot for {market.value}")
     for s in snapshots:
         direction = "bullish" if s.directed_heat > 0 else ("bearish" if s.directed_heat < 0 else "neutral")
-        typer.echo(f"  {s.symbol}: heat={s.directed_heat:.2f} ({direction})")
+        delta = f"Δ{s.change_pct:+.1f}%" if s.change_pct is not None else "NEW"
+        typer.echo(f"  {s.symbol}: heat={s.directed_heat:.2f} ({direction}) [{delta}]")
 
 
 if __name__ == "__main__":

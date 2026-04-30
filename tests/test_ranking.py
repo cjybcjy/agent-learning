@@ -77,3 +77,32 @@ def test_rank_neutral_fallback_by_base_heat() -> None:
 
 def test_rank_empty_input() -> None:
     assert rank_snapshots([]) == []
+
+
+def test_rank_change_pct_symbols_rank_before_new() -> None:
+    """Symbols with valid Δ% sort before NEW symbols."""
+    # "A" has Δ%=+50, "B" has no Δ% (NEW) but higher heat
+    a = _snapshot("A", directed_heat=3.0)
+    a.change_pct = 50.0
+    b = _snapshot("B", directed_heat=8.0)  # NEW, higher heat but no Δ%
+
+    result = rank_snapshots([b, a], top_n=10)
+
+    # A should rank #1 (has Δ%), B should rank #2 (NEW, fallback by |H|)
+    assert result[0].symbol == "A"
+    assert result[0].rank_bullish == 1
+    assert result[1].symbol == "B"
+    assert result[1].rank_bullish == 2
+
+
+def test_rank_among_change_pct_symbols_sorts_by_abs_delta() -> None:
+    """Among symbols WITH Δ%, sort by |Δ%| descending."""
+    a = _snapshot("A", directed_heat=5.0)
+    a.change_pct = 30.0
+    b = _snapshot("B", directed_heat=2.0)
+    b.change_pct = 200.0
+
+    result = rank_snapshots([a, b], top_n=10)
+
+    assert result[0].symbol == "B"  # |200%| > |30%|
+    assert result[1].symbol == "A"
