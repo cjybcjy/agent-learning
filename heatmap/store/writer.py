@@ -1,8 +1,12 @@
 import asyncio
 import json
+import logging
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from heatmap.store.dao import Store, RawMessage
+
+LOG = logging.getLogger("heatmap.writer")
 
 
 class BatchWriter:
@@ -35,20 +39,31 @@ class BatchWriter:
         try:
             for msg in batch:
                 await store.insert_message(msg)
-        except Exception:
+        except Exception as e:
+            LOG.exception("Batch flush failed, writing %d messages to DLQ", len(batch))
             if self.dlq_dir:
-                self._write_dlq(batch)
+                await self._write_dlq(batch)
 
-    def _write_dlq(self, batch: list[RawMessage]):
+    async def _write_dlq(self, batch: list[RawMessage]):
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-        path = self.dlq_dir / f"dlq_{ts}.jsonl"
-        with open(path, "a", encoding="utf-8") as f:
-            for msg in batch:
-                f.write(json.dumps({
-                    "platform": msg.platform,
-                    "channel": msg.channel,
-                    "author_id": msg.author_id,
-                    "content": msg.content,
-                    "posted_at": msg.posted_at.isoformat(),
-                    "fetched_at": msg.fetched_at.isoformat(),
-                }, ensure_ascii=False) + "\n")
+        uid = uuid.uuid4().hex[:8]
+        path = self.dlq_dir / f"dlq_{ts}_{uid}.jsonl"
+
+        lines = []
+        for msg in batch:
+            lines.append(json.dumps({
+                "platform": msg.platform,
+                "channel": msg.channel,
+                "author_id": msg.author_id,
+                "content": msg.content,
+                "posted_at": msg.posted_at.isoformat(),
+                "fetched_at": msg.fetched_at.isoformat(),
+            }, ensure_ascii=False))
+
+        content = "\n".join(lines) + "\n"
+
+        def _sync_write():
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+        await asyncio.to_thread(_sync_write)

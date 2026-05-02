@@ -25,7 +25,7 @@ async def test_batch_writer_flushes_on_batch_size(store, tmp_path):
     )
     await queue.put(msg)
     await queue.put(msg)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.2)
 
     cur = await store._db.execute("SELECT COUNT(*) FROM raw_messages")
     row = await cur.fetchone()
@@ -54,7 +54,7 @@ async def test_batch_writer_dlq_on_failure(store, tmp_path):
         fetched_at=datetime.now(timezone.utc)
     )
     await queue.put(msg)
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.2)
 
     dlq_files = list((tmp_path / "dlq").glob("*.jsonl"))
     assert len(dlq_files) >= 1
