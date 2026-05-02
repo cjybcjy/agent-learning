@@ -90,10 +90,10 @@ CREATE TABLE IF NOT EXISTS ai_signals (
   pe_ratio REAL,
   pb_ratio REAL,
   roe_ttm REAL,
-  dividend_yield REAL
+  dividend_yield REAL,
+  UNIQUE(symbol, window_start, model_version)
 );
-CREATE INDEX IF NOT EXISTS idx_ai_signals_symbol ON ai_signals(symbol);
-CREATE INDEX IF NOT EXISTS idx_ai_signals_window ON ai_signals(window_start);
+CREATE INDEX IF NOT EXISTS idx_ai_signals_symbol_window ON ai_signals(symbol, window_start);
 
 CREATE TABLE IF NOT EXISTS ai_call_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
