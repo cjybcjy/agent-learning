@@ -1,0 +1,54 @@
+<h2>完整设计确认（全部补丁已整合）</h2>
+<p class="subtitle">16 个关键工程决策汇总</p>
+
+<div class="section">
+  <div class="label">存储层（4 个决策）</div>
+  <ol style="font-size:0.85em;">
+    <li>SQLite WAL 模式（PRAGMA journal_mode=WAL）</li>
+    <li>Rollup 预计算：rollup_30min / rollup_4h / rollup_daily</li>
+    <li>ai_signals 结构化：anomaly_score, sentiment_shift, key_driver, driver_keywords</li>
+    <li>asyncio.Queue 缓冲 + 单协程 BatchWriter 批量写入</li>
+  </ol>
+</div>
+
+<div class="section">
+  <div class="label">采集层（3 个决策）</div>
+  <ol style="font-size:0.85em;">
+    <li>Rate Limiter 按 domain:proxy_ip 维度隔离</li>
+    <li>Proxy Pool 冷却期机制（失败 3 次 → cooldown 10 分钟 → 自动恢复）</li>
+    <li>Collector 基类只写 Queue，不直接写库</li>
+  </ol>
+</div>
+
+<div class="section">
+  <div class="label">AI 引擎（3 个决策）</div>
+  <ol style="font-size:0.85em;">
+    <li>真实语料注入：Top 10 代表性帖子作为 Prompt 上下文</li>
+    <li>即时 α 触发：挂在 rollup_30min，突破阈值立刻分析 + WebSocket 推送</li>
+    <li>成本护栏：MAX_AI_CALLS_PER_DAY 令牌桶，超预算后 UI 标红提示手动分析</li>
+  </ol>
+</div>
+
+<div class="section">
+  <div class="label">Web API（2 个决策）</div>
+  <ol style="font-size:0.85em;">
+    <li>强制分页：/api/heatmap 默认 limit=50，支持游标分页</li>
+    <li>WebSocket 按市场订阅推送</li>
+  </ol>
+</div>
+
+<div class="section">
+  <div class="label">前端（2 个决策）</div>
+  <ol style="font-size:0.85em;">
+    <li>AI 聊天隐式携带上下文：点击标的时自动打包 symbol + α + 时间窗口</li>
+    <li>React + 热度榜单 + 趋势图 + AI 聊天面板常驻</li>
+  </ol>
+</div>
+
+<div class="section">
+  <div class="label">整体架构（2 个决策）</div>
+  <ol style="font-size:0.85em;">
+    <li>FastAPI + React，内网免登录部署</li>
+    <li>阶段一：扩展采集系统；阶段二：叠加 Web + AI</li>
+  </ol>
+</div>

@@ -1,0 +1,39 @@
+<h2>采集层设计（已整合全部微调）</h2>
+<p class="subtitle">按代理+域名限速 + 冷却期 + aiosqlite 非阻塞写入</p>
+
+<div class="section">
+  <div class="label">关键调整确认</div>
+  <ul style="font-size:0.85em;">
+    <li><b>Rate Limiter</b>：维度为 f"{domain}:{proxy_ip}"，50 代理 = 50 并发</li>
+    <li><b>Proxy Pool</b>：冷却期机制，失败 3 次 → cooldown 10 分钟 → 自动恢复</li>
+    <li><b>BatchWriter</b>：继续使用 aiosqlite（已是异步驱动），避免事件循环阻塞</li>
+  </ul>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">采集流水线完整数据流</div>
+  <div class="mockup-body" style="font-size:0.8em;">
+    <div style="display:flex; gap:8px; text-align:center; align-items:center;">
+      <div style="padding:6px; background:#e8f5e9; border-radius:4px; flex:1;">
+        <div style="font-weight:bold;">Collector A</div>
+        <div style="font-size:0.75em; color:#666;">雪球 + 代理 1</div>
+      </div>
+      <div style="padding:6px; background:#e8f5e9; border-radius:4px; flex:1;">
+        <div style="font-weight:bold;">Collector B</div>
+        <div style="font-size:0.75em; color:#666;">雪球 + 代理 2</div>
+      </div>
+      <div style="padding:6px; background:#fff3e0; border-radius:4px; flex:1;">
+        <div style="font-weight:bold;">Rate Limiter</div>
+        <div style="font-size:0.75em; color:#666;">domain:proxy 维度</div>
+      </div>
+      <div style="padding:6px; background:#e3f2fd; border-radius:4px; flex:1;">
+        <div style="font-weight:bold;">Queue</div>
+        <div style="font-size:0.75em; color:#666;">asyncio.Queue</div>
+      </div>
+      <div style="padding:6px; background:#fce4ec; border-radius:4px; flex:1;">
+        <div style="font-weight:bold;">BatchWriter</div>
+        <div style="font-size:0.75em; color:#666;">aiosqlite</div>
+      </div>
+    </div>
+  </div>
+</div>

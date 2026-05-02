@@ -1,0 +1,9 @@
+{"type":"server-started","port":65205,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:65205","screen_dir":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/content","state_dir":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/state"}
+{"type":"screen-added","file":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/content/sources-scope.html"}
+{"type":"screen-added","file":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/content/time-granularity.html"}
+{"type":"screen-added","file":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/content/ai-analysis.html"}
+{"type":"screen-added","file":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/content/ai-interaction.html"}
+{"type":"screen-added","file":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/content/tech-stack.html"}
+{"type":"screen-added","file":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/content/data-collection.html"}
+{"type":"screen-added","file":"/home/kyrie/workspace/agent-learning/.superpowers/brainstorm/437736-1777715781/content/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}

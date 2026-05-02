@@ -1,0 +1,43 @@
+<h2>数据采集策略</h2>
+<p class="subtitle">用户选择：优先调用公开 API，API 无法覆盖的再用爬虫补充</p>
+
+<div class="section">
+  <div class="label">A股数据源 API</div>
+  <ul style="font-size:0.85em;">
+    <li>雪球：xueqiu.com（有非官方 API）</li>
+    <li>东方财富：有公开 API 接口</li>
+    <li>新浪财经：部分接口可用</li>
+  </ul>
+</div>
+
+<div class="section">
+  <div class="label">港股/美股数据源 API</div>
+  <ul style="font-size:0.85em;">
+    <li>富途：OpenAPI（需申请）</li>
+    <li>雪球：同上</li>
+    <li>Yahoo Finance：yfinance（非官方）</li>
+  </ul>
+</div>
+
+<div class="section">
+  <div class="label">币圈数据源 API</div>
+  <ul style="font-size:0.85em;">
+    <li>Telegram：Bot API / Telethon</li>
+    <li>Discord：Bot API（已有）</li>
+    <li>Twitter/X：API v2（需付费）</li>
+    <li>Reddit：PRAW API</li>
+  </ul>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">API 优先策略</div>
+  <div class="mockup-body">
+    <div style="display:flex; align-items:center; gap:8px; font-size:0.85em;">
+      <div style="padding:6px 12px; background:#e8f5e9; border-radius:4px;">公开 API ✓</div>
+      <div>→</div>
+      <div style="padding:6px 12px; background:#fff3e0; border-radius:4px;">官方/认证 API</div>
+      <div>→</div>
+      <div style="padding:6px 12px; background:#ffebee; border-radius:4px;">爬虫补充（最后手段）</div>
+    </div>
+  </div>
+</div>

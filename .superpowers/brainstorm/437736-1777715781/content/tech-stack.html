@@ -1,0 +1,43 @@
+<h2>技术栈与部署</h2>
+<p class="subtitle">用户选择：FastAPI + React/Vue，内网服务器部署</p>
+
+<div class="mockup">
+  <div class="mockup-header">架构概览</div>
+  <div class="mockup-body">
+    <div style="display:flex; gap:10px; text-align:center;">
+      <div class="mock-sidebar" style="width:25%">
+        <div style="font-size:0.8em;">React/Vue Frontend</div>
+        <div style="font-size:0.7em; color:#666;">内网访问</div>
+      </div>
+      <div style="width:5%; display:flex; align-items:center; justify-content:center;">←→</div>
+      <div class="mock-content" style="width:30%">
+        <div style="font-size:0.8em;">FastAPI Backend</div>
+        <div style="font-size:0.7em; color:#666;">REST API + WebSocket</div>
+      </div>
+      <div style="width:5%; display:flex; align-items:center; justify-content:center;">←→</div>
+      <div class="mock-sidebar" style="width:35%">
+        <div style="font-size:0.8em;">数据采集引擎</div>
+        <div style="font-size:0.7em; color:#666;">SQLite + AI 分析</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>优势</h4>
+    <ul>
+      <li>前后端分离，可独立迭代</li>
+      <li>React/Vue 生态丰富，可视化库多</li>
+      <li>内网部署，数据安全可控</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>挑战</h4>
+    <ul>
+      <li>需要前端构建步骤</li>
+      <li>内网需考虑认证方案</li>
+      <li>前端后端联调复杂度</li>
+    </ul>
+  </div>
+</div>

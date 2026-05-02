@@ -1,0 +1,41 @@
+<h2>存储层设计（已整合全部微调）</h2>
+<p class="subtitle">WAL + 缓冲队列 + Rollup + 结构化 AI 信号</p>
+
+<div class="section">
+  <div class="label">关键调整确认</div>
+  <ul style="font-size:0.85em;">
+    <li><b>ai_signals.driver_keywords</b>：JSON 数组，离散类别特征，供 XGBoost/LightGBM 直接消费</li>
+    <li><b>AI 触发挂在 rollup_30min</b>：即时 α 突破阈值立刻触发，日切只做沉淀</li>
+    <li><b>SQLite WAL</b>：PRAGMA journal_mode=WAL</li>
+    <li><b>asyncio.Queue 缓冲</b>：Collector → Queue → Batch Writer</li>
+  </ul>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">Rollup 触发时序</div>
+  <div class="mockup-body" style="font-size:0.85em;">
+    <div style="display:flex; gap:4px; text-align:center;">
+      <div style="padding:4px; background:#e8f5e9; border-radius:4px; flex:1;">T-30min<br/>采集</div>
+      <div style="padding:4px; background:#e8f5e9; border-radius:4px; flex:1;">T<br/>采集</div>
+      <div style="padding:4px; background:#fff3e0; border-radius:4px; flex:1;">T+0<br/>rollup_30min</div>
+      <div style="padding:4px; background:#ffebee; border-radius:4px; flex:1;">T+0<br/>即时 α 计算</div>
+      <div style="padding:4px; background:#fce4ec; border-radius:4px; flex:1.5;">T+0<br/>AI 分析 + WebSocket 推送</div>
+    </div>
+    <div style="margin-top:8px; color:#666; font-size:0.8em;">
+      日切（Daily）：T+1 00:00 只做历史沉淀，不做首发预警
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">ai_signals 结构化输出示例</div>
+  <div class="mockup-body" style="font-size:0.8em; font-family:monospace;">
+    <div>symbol: "BTC"</div>
+    <div>window_start: "2026-05-02T14:00:00Z"</div>
+    <div>anomaly_score: 0.92</div>
+    <div>sentiment_shift: "positive"</div>
+    <div>key_driver: "policy"</div>
+    <div style="color:#4caf50;">driver_keywords: ["美联储", "降息", "50BP"]</div>
+    <div style="margin-top:4px; color:#666;">raw_analysis: "..."</div>
+  </div>
+</div>

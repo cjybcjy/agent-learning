@@ -1,0 +1,65 @@
+<h2>AI 信号引擎（已修复致命漏洞）</h2>
+<p class="subtitle">真实语料上下文注入 + 结构化 JSON 输出</p>
+
+<div class="section">
+  <div class="label">致命漏洞修复</div>
+  <ul style="font-size:0.85em;">
+    <li><b>问题</b>：Prompt 只有统计量，无实际文本 → 大模型幻觉</li>
+    <li><b>修复</b>：从 raw_messages 抽取 Top 10 代表性帖子注入上下文</li>
+    <li><b>筛选逻辑</b>：按互动量（赞/转/评）+ 内容长度综合排序</li>
+  </ul>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">修正后的 Prompt 结构</div>
+  <div class="mockup-body" style="font-size:0.78em; font-family:monospace; background:#263238; color:#aed581; padding:12px; border-radius:4px;"
+>你是一名量化市场异动分析专家...
+
+[统计异动]
+标的: BTC | 即时α: +920% | 来源: twitter,telegram
+
+[真实讨论抽样 (Top 10)]
+1. "美联储降息50BPconfirmed，BTC to the moon 🚀" (赞: 2341)
+2. "BlackRock ETF 流入创新高，机构进来了" (赞: 1892)
+...
+10. "谁还有子弹？满仓了" (赞: 567)
+
+请基于上述真实讨论，返回 JSON..."
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">AI 信号输出 → ML 因子矩阵</div>
+  <div class="mockup-body" style="font-size:0.85em;"
+>
+    <div style="display:flex; gap:8px;"
+>
+      <div style="flex:1; padding:8px; background:#e8f5e9; border-radius:4px;"
+>
+        <div style="font-weight:bold;"
+>连续特征</div>
+        <div>anomaly_score: 0.92</div>
+        <div>sentiment_confidence: 0.88</div>
+        <div style="font-size:0.8em; color:#666; margin-top:4px;"
+>→ XGBoost 直接输入</div>
+      </div>
+      <div style="flex:1; padding:8px; background:#fff3e0; border-radius:4px;"
+>
+        <div style="font-weight:bold;"
+>类别特征</div>
+        <div>sentiment_shift: positive</div>
+        <div>key_driver: policy</div>
+        <div style="font-size:0.8em; color:#666; margin-top:4px;"
+>→ One-Hot / Label Encoding</div>
+      </div>
+      <div style="flex:1; padding:8px; background:#fce4ec; border-radius:4px;"
+>
+        <div style="font-weight:bold;"
+>稀疏 NLP 特征</div>
+        <div>driver_keywords: ["美联储","降息","50BP"]</div>
+        <div style="font-size:0.8em; color:#666; margin-top:4px;"
+>→ TF-IDF / 概念库映射</div>
+      </div>
+    </div>
+  </div>
+</div>
