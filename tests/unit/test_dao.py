@@ -56,6 +56,20 @@ async def test_rollup_30min_table_exists(store):
     row = await cur.fetchone()
     assert row is not None
 
+async def test_rollup_4h_table_exists(store):
+    cur = await store._db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='rollup_4h'"
+    )
+    row = await cur.fetchone()
+    assert row is not None
+
+async def test_rollup_daily_table_exists(store):
+    cur = await store._db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='rollup_daily'"
+    )
+    row = await cur.fetchone()
+    assert row is not None
+
 async def test_ai_signals_table_exists(store):
     cur = await store._db.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='ai_signals'"

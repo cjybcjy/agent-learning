@@ -42,10 +42,10 @@ CREATE TABLE IF NOT EXISTS rollup_30min (
   mention_count INTEGER NOT NULL,
   weighted_score REAL NOT NULL,
   source_count INTEGER NOT NULL,
-  PRIMARY KEY (symbol, window_start, market)
+  PRIMARY KEY (symbol, window_start)
 );
 CREATE INDEX IF NOT EXISTS idx_rollup_30min_symbol ON rollup_30min(symbol);
-CREATE INDEX IF NOT EXISTS idx_rollup_30min_window ON rollup_30min(window_start);
+CREATE INDEX IF NOT EXISTS idx_rollup30_market_window ON rollup_30min(market, window_start);
 
 CREATE TABLE IF NOT EXISTS rollup_4h (
   symbol TEXT NOT NULL,
@@ -54,10 +54,10 @@ CREATE TABLE IF NOT EXISTS rollup_4h (
   mention_count INTEGER NOT NULL,
   weighted_score REAL NOT NULL,
   source_count INTEGER NOT NULL,
-  PRIMARY KEY (symbol, window_start, market)
+  PRIMARY KEY (symbol, window_start)
 );
 CREATE INDEX IF NOT EXISTS idx_rollup_4h_symbol ON rollup_4h(symbol);
-CREATE INDEX IF NOT EXISTS idx_rollup_4h_window ON rollup_4h(window_start);
+CREATE INDEX IF NOT EXISTS idx_rollup4h_market_window ON rollup_4h(market, window_start);
 
 CREATE TABLE IF NOT EXISTS rollup_daily (
   symbol TEXT NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS rollup_daily (
   alpha REAL,
   beta REAL,
   composite REAL,
-  PRIMARY KEY (symbol, date, market)
+  PRIMARY KEY (symbol, date)
 );
 CREATE INDEX IF NOT EXISTS idx_rollup_daily_symbol ON rollup_daily(symbol);
 CREATE INDEX IF NOT EXISTS idx_rollup_daily_date ON rollup_daily(date);
