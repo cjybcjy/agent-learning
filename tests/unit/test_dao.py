@@ -47,3 +47,25 @@ async def test_concurrent_inserts_preserve_message_ids(store):
     assert len(set(ids)) == 50  # all unique, no collisions
     counts = await store.daily_mention_counts("2026-04-30")
     assert sum(counts.values()) == 50
+
+
+async def test_rollup_30min_table_exists(store):
+    cur = await store._db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='rollup_30min'"
+    )
+    row = await cur.fetchone()
+    assert row is not None
+
+async def test_ai_signals_table_exists(store):
+    cur = await store._db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='ai_signals'"
+    )
+    row = await cur.fetchone()
+    assert row is not None
+
+async def test_ai_call_log_table_exists(store):
+    cur = await store._db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='ai_call_log'"
+    )
+    row = await cur.fetchone()
+    assert row is not None
