@@ -21,6 +21,11 @@ CONFIG = ROOT / "config"
 DATA = ROOT / "data"
 
 
+def _next_daily_run(now: datetime) -> datetime:
+    target_today = now.replace(hour=0, minute=5, second=0, microsecond=0)
+    return target_today if target_today > now else target_today + timedelta(days=1)
+
+
 async def aggregate_and_publish(store: Store, thresholds, publisher: LarkPublisher,
                                 date: str, *, dry_run: bool = False) -> int:
     """跑一次日聚合 + 飞书发布。返回 Top 数量。dry_run=True 时跳过发布。"""
@@ -43,7 +48,7 @@ async def aggregate_and_publish(store: Store, thresholds, publisher: LarkPublish
 async def _daily_loop(store: Store, thresholds, publisher: LarkPublisher):
     while True:
         now = datetime.now(timezone.utc)
-        next_run = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
+        next_run = _next_daily_run(now)
         wait_s = (next_run - now).total_seconds()
         LOG.info("next daily report at %s UTC (in %.1f h)", next_run.isoformat(), wait_s / 3600)
         await asyncio.sleep(wait_s)
