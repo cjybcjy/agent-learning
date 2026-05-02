@@ -36,3 +36,22 @@ def select_top(cands: list[Candidate], alpha_min: float, beta_min: float, top_n:
     new_items.sort(key=lambda x: x.beta, reverse=True)
     regular.sort(key=lambda x: x.composite, reverse=True)
     return (new_items + regular)[:top_n]
+
+
+def compute_instant_alpha(current: float, historical_values: list[float]) -> float:
+    """Compute EMA-smoothed instant alpha"""
+    if not historical_values:
+        return float('inf')
+    ema = _ema(historical_values, span=7)
+    return current / ema - 1.0
+
+
+def _ema(values: list[float], span: int) -> float:
+    """Exponential moving average"""
+    if not values:
+        return 0.0
+    alpha = 2.0 / (span + 1)
+    ema = values[0]
+    for v in values[1:]:
+        ema = alpha * v + (1 - alpha) * ema
+    return ema
