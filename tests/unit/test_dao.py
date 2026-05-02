@@ -118,3 +118,34 @@ async def test_ai_call_log_roundtrip(store):
     )
     row = await cur.fetchone()
     assert row[0] == 1
+
+async def test_insert_and_get_rollup_30min(store):
+    await store.insert_rollup_30min(
+        symbol="BTC", window_start="2026-05-02T14:00:00Z", market="crypto",
+        mention_count=100, weighted_score=100.0, source_count=5
+    )
+    rows = await store.get_rollup_30min("BTC", "2026-05-02T14:00:00Z")
+    assert len(rows) == 1
+    assert rows[0]["mention_count"] == 100
+
+async def test_rollup_30min_upsert(store):
+    await store.insert_rollup_30min("BTC", "2026-05-02T14:00:00Z", "crypto", 10, 10.0, 1)
+    await store.insert_rollup_30min("BTC", "2026-05-02T14:00:00Z", "crypto", 20, 20.0, 2)
+    rows = await store.get_rollup_30min("BTC", "2026-05-02T14:00:00Z")
+    assert rows[0]["mention_count"] == 20  # upsert replaced
+
+async def test_insert_ai_call_log(store):
+    await store.insert_ai_call_log(
+        symbol="BTC", window_start="2026-05-02T14:00:00Z",
+        model_version="claude-sonnet-4-6", called_at="2026-05-02T14:05:00Z"
+    )
+    count = await store.get_ai_call_count_today("2026-05-02")
+    assert count == 1
+
+async def test_ai_call_count_multiple(store):
+    for i in range(3):
+        await store.insert_ai_call_log(
+            "BTC", "2026-05-02T14:00:00Z", "v1", f"2026-05-02T{i:02d}:00:00Z"
+        )
+    count = await store.get_ai_call_count_today("2026-05-02")
+    assert count == 3

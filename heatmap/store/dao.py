@@ -95,3 +95,45 @@ class Store:
         )
         row = await cur.fetchone()
         return row[0] if row else None
+
+    async def insert_rollup_30min(
+        self, symbol: str, window_start: str, market: str,
+        mention_count: int, weighted_score: float, source_count: int
+    ) -> None:
+        async with self._write_lock:
+            await self._db.execute(
+                "INSERT OR REPLACE INTO rollup_30min"
+                "(symbol,window_start,market,mention_count,weighted_score,source_count)"
+                " VALUES (?,?,?,?,?,?)",
+                (symbol, window_start, market, mention_count, weighted_score, source_count),
+            )
+            await self._db.commit()
+
+    async def get_rollup_30min(self, symbol: str, window_start: str) -> list[dict]:
+        cur = await self._db.execute(
+            "SELECT * FROM rollup_30min WHERE symbol=? AND window_start=?",
+            (symbol, window_start),
+        )
+        rows = await cur.fetchall()
+        cols = [desc[0] for desc in cur.description]
+        return [dict(zip(cols, row)) for row in rows]
+
+    async def insert_ai_call_log(
+        self, symbol: str, window_start: str, model_version: str,
+        called_at: str, cost_estimate: float | None = None
+    ) -> None:
+        async with self._write_lock:
+            await self._db.execute(
+                "INSERT INTO ai_call_log(symbol,window_start,model_version,called_at,cost_estimate)"
+                " VALUES (?,?,?,?,?)",
+                (symbol, window_start, model_version, called_at, cost_estimate),
+            )
+            await self._db.commit()
+
+    async def get_ai_call_count_today(self, date: str) -> int:
+        cur = await self._db.execute(
+            "SELECT COUNT(*) FROM ai_call_log WHERE substr(called_at,1,10) = ?",
+            (date,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else 0
