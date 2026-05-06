@@ -11,6 +11,5 @@ class CostGuard:
         return count < self.max_calls
 
     async def record_call(self, symbol: str, window_start: str, model_version: str) -> None:
-        from datetime import datetime, timezone
-        called_at = datetime.now(timezone.utc).isoformat()
+        called_at = window_start
         await self.store.insert_ai_call_log(symbol, window_start, model_version, called_at)

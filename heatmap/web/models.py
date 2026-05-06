@@ -6,7 +6,7 @@ class HeatmapItem(BaseModel):
     rank: int
     mention_count: int
     weighted_score: float
-    instant_alpha: str | None = None
+    instant_alpha: float | None = None
     anomaly_score: float | None = None
     sentiment_shift: str | None = None
     key_driver: str | None = None

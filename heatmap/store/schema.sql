@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS ai_signals (
   model_version TEXT NOT NULL,
   created_at TEXT NOT NULL,
   anomaly_score REAL,
-  sentiment_shift REAL,
+  sentiment_shift TEXT,
   sentiment_confidence REAL,
   key_driver TEXT,
   key_driver_confidence REAL,
