@@ -2,3 +2,20 @@ stage_a_top_n: 50
 stage_b_top_n: 10
 alpha_min: 0.5
 beta_min: 1.5
+
+# AI 信号引擎配置
+ai:
+  instant_alpha_threshold: 2.0
+  min_mentions_for_ai: 20
+  max_calls_per_day: 50
+  model: "claude-sonnet-4-6"
+  api_key_env: "ANTHROPIC_API_KEY"
+
+# 限速配置
+rate_limits:
+  "xueqiu.com": 1.0
+  "eastmoney.com": 0.5
+  "api.twitter.com": 2.0
+
+# 代理池
+proxies: []

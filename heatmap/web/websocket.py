@@ -7,7 +7,7 @@ class WebSocketManager:
         self.connections: dict[str, list[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, client_id: str):
-        await websocket.accept()
+        # Note: websocket.accept() is called by the route handler before this
         self.connections.setdefault(client_id, []).append(websocket)
 
     async def disconnect(self, websocket: WebSocket, client_id: str):

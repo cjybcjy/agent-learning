@@ -3,11 +3,21 @@ from typing import Any
 import yaml
 from pydantic import BaseModel
 
+class AIConfig(BaseModel):
+    instant_alpha_threshold: float = 2.0
+    min_mentions_for_ai: int = 20
+    max_calls_per_day: int = 50
+    model: str = "claude-sonnet-4-6"
+    api_key_env: str = "ANTHROPIC_API_KEY"
+
 class Thresholds(BaseModel):
     stage_a_top_n: int
     stage_b_top_n: int
     alpha_min: float
     beta_min: float
+    ai: AIConfig = AIConfig()
+    rate_limits: dict[str, float] = {}
+    proxies: list[str] = []
 
 class DiscordGuild(BaseModel):
     guild_id: str

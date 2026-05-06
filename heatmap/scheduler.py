@@ -8,11 +8,13 @@ from heatmap.config import load_thresholds, load_sources
 from heatmap.store.dao import Store
 from heatmap.extractor.dictionary import load_aliases
 from heatmap.extractor.ac import AhoCorasickExtractor
-from heatmap.aggregator.pipeline import run_daily_aggregation
-from heatmap.reporter.templates import render_today_table, render_archive_collapsible
-from heatmap.reporter.lark_doc import LarkPublisher, LarkCliRunner
+from heatmap.aggregator.rollup import RollupEngine
+from heatmap.ai.cost_guard import CostGuard
+from heatmap.ai.signal_engine import SignalEngine
 from heatmap.collectors.telegram import TelegramCollector
 from heatmap.collectors.discord import DiscordCollector
+from heatmap.store.writer import BatchWriter
+from heatmap.web.websocket import ws_manager
 
 LOG = logging.getLogger("heatmap.scheduler")
 
@@ -21,60 +23,94 @@ CONFIG = ROOT / "config"
 DATA = ROOT / "data"
 
 
-def _next_daily_run(now: datetime) -> datetime:
-    target_today = now.replace(hour=0, minute=5, second=0, microsecond=0)
-    return target_today if target_today > now else target_today + timedelta(days=1)
+def _next_30min_boundary(now: datetime) -> datetime:
+    """Round up to next 30-minute boundary."""
+    minute = (now.minute // 30 + 1) * 30
+    boundary = now.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=minute)
+    return boundary
 
 
-async def aggregate_and_publish(store: Store, thresholds, publisher: LarkPublisher,
-                                date: str, *, dry_run: bool = False) -> int:
-    """跑一次日聚合 + 飞书发布。返回 Top 数量。dry_run=True 时跳过发布。"""
-    top = await run_daily_aggregation(
-        store, date,
-        alpha_min=thresholds.alpha_min, beta_min=thresholds.beta_min,
-        stage_a_top_n=thresholds.stage_a_top_n, stage_b_top_n=thresholds.stage_b_top_n,
-    )
-    today_xml = render_today_table(top, date)
-    archive_xml = render_archive_collapsible(top, date)
-    LOG.info("aggregated %s, %d symbols qualified", date, len(top))
-    if dry_run:
-        LOG.info("[dry-run] skipping feishu publish; today_xml preview: %.200s", today_xml)
-    else:
-        await publisher.publish_today(today_xml=today_xml, archive_xml=archive_xml)
-        LOG.info("published %s to feishu", date)
-    return len(top)
+class RollupScheduler:
+    def __init__(self, store: Store, engine: RollupEngine, completion_queue: asyncio.Queue):
+        self.store = store
+        self.engine = engine
+        self.completion_queue = completion_queue
+
+    async def run(self):
+        while True:
+            now = datetime.now(timezone.utc)
+            next_boundary = _next_30min_boundary(now)
+            wait_s = (next_boundary - now).total_seconds()
+            LOG.info("next rollup at %s UTC (in %.1f min)", next_boundary.isoformat(), wait_s / 60)
+            await asyncio.sleep(wait_s)
+
+            window_end = next_boundary
+            window_start = window_end - timedelta(minutes=30)
+            ws_iso = window_start.isoformat().replace("+00:00", "Z")
+            we_iso = window_end.isoformat().replace("+00:00", "Z")
+
+            LOG.info("computing rollup_30min for %s to %s", ws_iso, we_iso)
+            try:
+                await self.engine.compute_rollup_30min(ws_iso, we_iso)
+                await self.completion_queue.put(ws_iso)
+            except Exception:
+                LOG.exception("rollup_30min failed for %s", ws_iso)
+                continue
+
+            # 4h boundary check
+            if window_end.hour % 4 == 0 and window_end.minute == 0:
+                h4_start = (window_end - timedelta(hours=4)).isoformat().replace("+00:00", "Z")
+                LOG.info("computing rollup_4h for %s", h4_start)
+                try:
+                    await self.engine.compute_rollup_4h(h4_start)
+                except Exception:
+                    LOG.exception("rollup_4h failed for %s", h4_start)
+
+            # Daily boundary check
+            if window_end.hour == 0 and window_end.minute == 0:
+                date = (window_end - timedelta(days=1)).date().isoformat()
+                LOG.info("computing rollup_daily for %s", date)
+                try:
+                    await self.engine.compute_rollup_daily(date)
+                except Exception:
+                    LOG.exception("rollup_daily failed for %s", date)
 
 
-async def _daily_loop(store: Store, thresholds, publisher: LarkPublisher):
-    while True:
-        now = datetime.now(timezone.utc)
-        next_run = _next_daily_run(now)
-        wait_s = (next_run - now).total_seconds()
-        LOG.info("next daily report at %s UTC (in %.1f h)", next_run.isoformat(), wait_s / 3600)
-        await asyncio.sleep(wait_s)
-        date = (next_run - timedelta(days=1)).date().isoformat()
-        try:
-            await aggregate_and_publish(store, thresholds, publisher, date)
-        except Exception:
-            LOG.exception("daily report failed for %s", date)
+class AIScheduler:
+    def __init__(self, store: Store, signal_engine: SignalEngine, completion_queue: asyncio.Queue):
+        self.store = store
+        self.signal_engine = signal_engine
+        self.completion_queue = completion_queue
+
+    async def run(self):
+        while True:
+            window_start = await self.completion_queue.get()
+            LOG.info("AI scheduler checking window %s", window_start)
+            try:
+                cur = await self.store._db.execute(
+                    "SELECT DISTINCT symbol, market FROM rollup_30min WHERE window_start = ?",
+                    (window_start,),
+                )
+                rows = await cur.fetchall()
+                for symbol, market in rows:
+                    try:
+                        result = await self.signal_engine.check_and_trigger(symbol, window_start, market)
+                        if result:
+                            LOG.info("AI signal triggered for %s: anomaly=%s", symbol, result.get("anomaly_score"))
+                    except Exception:
+                        LOG.exception("AI check failed for %s @ %s", symbol, window_start)
+            except Exception:
+                LOG.exception("AI scheduler failed for window %s", window_start)
 
 
-async def run_once(date: str | None = None, dry_run: bool = False) -> int:
-    """命令行入口：立即跑一次聚合 + 发布并退出。"""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    thresholds = load_thresholds(CONFIG / "thresholds.yaml")
-    target_date = date or datetime.now(timezone.utc).date().isoformat()
-    store = Store(DATA / "heatmap.db")
-    await store.init()
-    try:
-        publisher = LarkPublisher(state_file=DATA / "state.json", runner=LarkCliRunner())
-        return await aggregate_and_publish(store, thresholds, publisher, target_date, dry_run=dry_run)
-    finally:
-        await store.close()
+async def _batch_writer_loop(queue: asyncio.Queue, store: Store):
+    """Run BatchWriter for future collectors that use Queue."""
+    writer = BatchWriter(batch_size=100, dlq_dir=DATA / "dlq")
+    await writer.run(queue, store)
 
 
 async def serve():
-    """常驻调度：collectors + 每日 00:05 报告。"""
+    """常驻调度：collectors + rollup + AI + batch writer."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     thresholds = load_thresholds(CONFIG / "thresholds.yaml")
     sources = load_sources(CONFIG / "sources.yaml")
@@ -83,17 +119,28 @@ async def serve():
 
     store = Store(DATA / "heatmap.db")
     await store.init()
-    publisher = LarkPublisher(state_file=DATA / "state.json", runner=LarkCliRunner())
 
-    tasks = [asyncio.create_task(_daily_loop(store, thresholds, publisher))]
+    queue = asyncio.Queue(maxsize=10000)
+    rollup_completion = asyncio.Queue()
 
+    engine = RollupEngine(store)
+    cost_guard = CostGuard(store, max_calls_per_day=thresholds.ai.max_calls_per_day)
+    signal_engine = SignalEngine(store, cost_guard, thresholds.ai, ws_manager)
+
+    tasks = [
+        asyncio.create_task(_batch_writer_loop(queue, store)),
+        asyncio.create_task(RollupScheduler(store, engine, rollup_completion).run()),
+        asyncio.create_task(AIScheduler(store, signal_engine, rollup_completion).run()),
+    ]
+
+    # Legacy collectors write directly to store for now
     if sources.telegram.channels:
         LOG.info("starting telegram collector for %d channels", len(sources.telegram.channels))
         tasks.append(asyncio.create_task(
             TelegramCollector(store, extractor, sources.telegram.channels).run()
         ))
     else:
-        LOG.warning("config/sources.yaml: telegram.channels is empty — no telegram collector")
+        LOG.warning("config/sources.yaml: telegram.channels is empty")
 
     if sources.discord.guilds:
         watch = {int(cid) for g in sources.discord.guilds for cid in g.channel_ids}
@@ -102,28 +149,21 @@ async def serve():
             DiscordCollector(store, extractor, watch).run()
         ))
     else:
-        LOG.warning("config/sources.yaml: discord.guilds is empty — no discord collector")
+        LOG.warning("config/sources.yaml: discord.guilds is empty")
 
     LOG.info("scheduler ready: %d tasks running. Ctrl+C to stop.", len(tasks))
-    await asyncio.gather(*tasks)
+    try:
+        await asyncio.gather(*tasks)
+    finally:
+        await signal_engine.close()
+        await store.close()
 
 
 def main():
     parser = argparse.ArgumentParser(prog="heatmap.scheduler",
-        description="Crypto heatmap scheduler. Default: run as daemon.")
-    parser.add_argument("--run-once", action="store_true",
-        help="Run one aggregation+publish cycle and exit.")
-    parser.add_argument("--date", default=None,
-        help="UTC date YYYY-MM-DD for --run-once (default: today UTC).")
-    parser.add_argument("--dry-run", action="store_true",
-        help="With --run-once: aggregate only, do NOT call lark-cli.")
+        description="Market heatmap scheduler.")
     args = parser.parse_args()
-
-    if args.run_once:
-        n = asyncio.run(run_once(date=args.date, dry_run=args.dry_run))
-        print(f"done: {n} symbols qualified")
-    else:
-        asyncio.run(serve())
+    asyncio.run(serve())
 
 
 if __name__ == "__main__":

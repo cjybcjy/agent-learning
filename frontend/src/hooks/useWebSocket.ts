@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
-export function useWebSocket(url: string, markets: string[]) {
+interface UseWebSocketOptions {
+  onReconnect?: () => void
+}
+
+export function useWebSocket(url: string, markets: string[], options?: UseWebSocketOptions) {
   const ws = useRef<WebSocket | null>(null)
   const [messages, setMessages] = useState<any[]>([])
   const [connected, setConnected] = useState(false)
   const reconnectDelay = useRef(1000)
+  const wasConnected = useRef(false)
 
   const connect = useCallback(() => {
     const socket = new WebSocket(url)
@@ -14,6 +19,12 @@ export function useWebSocket(url: string, markets: string[]) {
       setConnected(true)
       reconnectDelay.current = 1000
       socket.send(JSON.stringify({ action: 'subscribe', markets }))
+
+      // Trigger reconnect callback if this is a reconnection
+      if (wasConnected.current && options?.onReconnect) {
+        options.onReconnect()
+      }
+      wasConnected.current = true
 
       const heartbeat = setInterval(() => {
         if (socket.readyState === WebSocket.OPEN) {
@@ -38,7 +49,7 @@ export function useWebSocket(url: string, markets: string[]) {
         connect()
       }, reconnectDelay.current)
     }
-  }, [url, markets])
+  }, [url, markets, options])
 
   useEffect(() => {
     connect()

@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from heatmap.store.dao import Store, RawMessage
+from heatmap.store.dao import Store, RawMessage, QueuedMessage
 
 LOG = logging.getLogger("heatmap.writer")
 
@@ -35,22 +35,27 @@ class BatchWriter:
                     await self._flush(store, batch)
                 raise
 
-    async def _flush(self, store: Store, batch: list[RawMessage]):
+    async def _flush(self, store: Store, batch: list):
         try:
-            for msg in batch:
-                await store.insert_message(msg)
-        except Exception as e:
+            for item in batch:
+                if isinstance(item, QueuedMessage):
+                    await store.insert_message_with_mentions(item.raw, item.mentions or [])
+                else:
+                    # Backward compat: raw RawMessage without mentions
+                    await store.insert_message(item)
+        except Exception:
             LOG.exception("Batch flush failed, writing %d messages to DLQ", len(batch))
             if self.dlq_dir:
                 await self._write_dlq(batch)
 
-    async def _write_dlq(self, batch: list[RawMessage]):
+    async def _write_dlq(self, batch: list):
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         uid = uuid.uuid4().hex[:8]
         path = self.dlq_dir / f"dlq_{ts}_{uid}.jsonl"
 
         lines = []
-        for msg in batch:
+        for item in batch:
+            msg = item.raw if isinstance(item, QueuedMessage) else item
             lines.append(json.dumps({
                 "platform": msg.platform,
                 "channel": msg.channel,

@@ -3,7 +3,7 @@
 **日期：** 2026-05-02
 **版本：** v2（A股/港股/美股/币圈 + Web 可视化 + AI 分析）
 **仓库：** agent-learning
-**前置设计：** [2026-04-30-crypto-heatmap-design.md](2026-04-30-crypto-heatmap-design.md)（v1 币圈 MVP）
+**前置设计：** 2026-04-30 币圈 MVP（已归档，见 git 历史）
 
 ---
 
@@ -143,6 +143,13 @@ CREATE TABLE IF NOT EXISTS ai_signals (
 
   raw_analysis TEXT,     -- 大模型推理原文
 
+  -- 预留：基本面数据 Join 字段（未来扩展）
+  -- 下游 ML 模型可结合热度因子与基本面因子做联合判断
+  pe_ratio REAL,         -- 市盈率
+  pb_ratio REAL,         -- 市净率
+  roe_ttm REAL,          -- ROE (TTM)
+  dividend_yield REAL,   -- 股息率
+
   FOREIGN KEY (symbol, window_start) REFERENCES rollup_30min(symbol, window_start)
 );
 CREATE INDEX IF NOT EXISTS idx_ai_signals_symbol ON ai_signals(symbol);
@@ -181,7 +188,8 @@ CREATE TABLE IF NOT EXISTS daily_scores (
   3. 如果是 4h 边界（00:00, 04:00, 08:00...），
      汇总最近 8 个 30min 记录 → 写入 rollup_4h
   4. 如果是日边界（00:00 UTC），
-     汇总全天 → 写入 rollup_daily（同时计算 α/β/composite）
+     直接基于 rollup_4h 累加（6 条 4h 记录）→ 写入 rollup_daily（同时计算 α/β/composite）
+     【优化：不回溯 raw_messages 全表，计算复杂度 O(1)】
   5. 对 rollup_30min 中即时 α 突破阈值的标的触发 AI 分析 → 写入 ai_signals
      并通过 WebSocket 推送给前端
 ```
@@ -211,7 +219,7 @@ class BatchWriter:
 
 - **唯一**的 SQLite 写入入口，避免多协程竞争
 - aiosqlite 已经是异步驱动，无需 `asyncio.to_thread()`
-- Queue 满时（maxsize=10000）新数据丢弃并告警
+- Queue 满时（maxsize=10000）新数据写入 **File-based Dead Letter Queue**（本地 `.jsonl` 文件），系统空闲时通过恢复协程重播入库，避免极端行情下丢失关键异动信号
 
 ---
 
@@ -280,9 +288,11 @@ class BaseCollector(Protocol):
 每完成一个 `rollup_30min` 窗口后：
 
 ```python
+# 即时 α 计算（EMA 平滑，避免时间带偏差误触发）
 current_30min = rollup_30min[symbol][window]
-historical_avg = mean(rollup_30min[symbol][same_time_last_7_days])
-instant_alpha = current_30min / historical_avg - 1
+# 过去 14 天同一时段的 EMA，消除各市场天然活跃时间带差异
+historical_ema = ema(rollup_30min[symbol][same_time_last_14_days], span=7)
+instant_alpha = current_30min / historical_ema - 1
 
 if instant_alpha >= threshold_alpha and current_30min >= threshold_min_mentions:
     # 检查日预算
@@ -334,7 +344,15 @@ async def get_top_posts(symbol: str, window_start: str, limit: int = 10) -> list
 }
 ```
 
-### 5.4 结构化输出与 ML 因子消费
+### 5.4 API 级 JSON 强制约束
+
+为确保 100% 解析成功率，不依赖 Prompt 中的格式说明：
+
+- **OpenAI**: 请求参数设置 `response_format={"type": "json_object"}`
+- **Claude**: 请求参数设置 `tool_choice={"type": "tool", "name": "analyze_market_anomaly"}`，将 Schema 定义为 Tool 的 input_schema
+- 解析失败时记录原始响应并重试一次，两次均失败则标记为 `parse_error` 并存入 `raw_analysis`
+
+### 5.5 结构化输出与 ML 因子消费
 
 | 字段 | 类型 | ML 用途 |
 |---|---|---|
@@ -342,9 +360,17 @@ async def get_top_posts(symbol: str, window_start: str, limit: int = 10) -> list
 | `sentiment_confidence` | float (连续) | 信噪比判断 |
 | `sentiment_shift` | categorical | One-Hot / Label Encoding |
 | `key_driver` | categorical | One-Hot / Label Encoding |
-| `driver_keywords` | JSON 数组 | TF-IDF 或概念库映射 → Alpha 因子 |
+| `driver_keywords` | JSON 数组 | 预训练词向量 Mean Pooling 或 Hashing Trick → Alpha 因子 |
 
-### 5.5 WebSocket 实时推送
+**特征工程注意事项**：
+
+- **NLP 特征状态一致性**：`driver_keywords` 向量化必须使用离线训练好的冻结模型（`.pkl` 序列化的 TfidfVectorizer 或预训练 Word2Vec），禁止在线实时计算 TF-IDF（会导致特征空间漂移和维度不对齐）
+- **Hashing Trick 备选**：对于工程维护优先的场景，可用 sklearn.feature_extraction.FeatureHasher 替代 TF-IDF，无需维护词表
+- **未来函数防范**：离线训练时特征与 label 必须严格时间截面对齐。30min 窗口的 anomaly_score 只能 Join 到该截面前的累积特征，label（未来 N 期收益率）的基准价必须取自该窗口的收盘价/VWAP
+- **价值交叉筛选**：A股/港股场景下，高置信度 sentiment_shift=positive 且 key_driver=fundamental/policy 时，可叠加 PB 分位数、ROE、股息率等静态截面筛选，过滤游资炒作假阳性
+- **特征存储优化**：高维 numpy.ndarray 实时查询时建议前置 Redis/Memcached 缓存层，SQLite 仅作为持久化备份
+
+### 5.6 WebSocket 实时推送
 
 AI 分析完成后，立即推送：
 
@@ -508,6 +534,15 @@ frontend/
   }
 }
 ```
+
+### 7.4 WebSocket 断线重连与状态同步
+
+`useWebSocket.ts` 实现：
+
+1. **指数退避重连**：断线后等待 1s → 2s → 4s → 8s → 最大 30s 重试
+2. **重连后补齐**：重新连接成功后，自动调用 REST API `/api/heatmap?since=<last_seen_timestamp>` 拉取断线期间错过的 `ai_signal` 和 `rollup_update`
+3. **心跳保活**：每 30 秒发送一次 `{"type": "ping"}`，服务端响应 `{"type": "pong"}`，无响应则判定为断线
+4. **重连状态 UI**：断线期间显示 "连接中..." 提示，重连成功后静默恢复
 
 大模型因此能"看见"用户正在指着屏幕上的哪一行发问。
 
