@@ -34,3 +34,27 @@ pytest -v
 
 - 设计稿：[docs/superpowers/specs/2026-04-30-crypto-heatmap-design.md](docs/superpowers/specs/2026-04-30-crypto-heatmap-design.md)
 - 实现计划：[docs/superpowers/plans/2026-04-30-crypto-heatmap-plan.md](docs/superpowers/plans/2026-04-30-crypto-heatmap-plan.md)
+
+
+##启动脚本文件scripts/demo.sh
+
+启动完整演示（Web + 调度器）
+  ./scripts/demo.sh all
+
+只启动 Web 服务
+  ./scripts/demo.sh web
+
+只启动调度器
+  ./scripts/demo.sh scheduler
+
+查看运行状态
+  ./scripts/demo.sh status
+
+停止所有进程
+  ./scripts/demo.sh stop
+
+ 脚本会自动：
+  - 检查 Python 环境和依赖
+  - 记录进程 PID 到 /tmp/heatmap-*.pid
+  - 统一日志输出（带颜色）
+  - Ctrl+C 时等待子进程退出
