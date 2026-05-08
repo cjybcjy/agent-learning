@@ -1,29 +1,54 @@
+import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
+import asyncio
+import json
+
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from heatmap.config import load_thresholds
+from heatmap.config_store import ConfigStore
 from heatmap.store.dao import Store
-from heatmap.web.models import HeatmapResponse, HeatmapItem, ChatRequest
+from heatmap.web.models import HeatmapResponse, HeatmapItem, ChatRequest, ModelSwitchRequest
 from heatmap.web.websocket import ws_manager
+from heatmap.ai.chat_engine import ChatEngine
+from heatmap.ai.llm_client import get_provider_models, PROVIDERS
+
+LOG = logging.getLogger("heatmap.web.api")
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CONFIG = ROOT / "config"
 DATA = ROOT / "data"
 
 store: Store | None = None
+chat_engine: ChatEngine | None = None
+config_store: ConfigStore | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global store
+    global store, chat_engine, config_store
+    thresholds = load_thresholds(CONFIG / "thresholds.yaml")
     store = Store(DATA / "heatmap.db")
     await store.init()
+    config_store = ConfigStore(DATA / "secrets.yaml")
+    chat_engine = ChatEngine(store, thresholds.ai, config_store)
+    # Restore persisted active provider if any
+    active_provider = config_store.get("ACTIVE_PROVIDER")
+    if active_provider and active_provider in PROVIDERS:
+        active_model = config_store.get("ACTIVE_MODEL")
+        chat_engine.switch_provider(active_provider, active_model)
     yield
+    if chat_engine:
+        await chat_engine.close()
     await store.close()
     store = None
+    chat_engine = None
+    config_store = None
 
 
 app = FastAPI(lifespan=lifespan)
@@ -38,9 +63,6 @@ async def get_heatmap(
 ):
     if store is None:
         return HeatmapResponse(items=[], next_cursor=None)
-    if granularity == "week":
-        # Week aggregation not yet implemented; fallback to day
-        granularity = "day"
     items_raw, next_cursor = await store.get_rollup_heatmap(granularity, market, limit, cursor)
     items = [
         HeatmapItem(
@@ -85,28 +107,139 @@ async def get_symbols(market: str = Query("all")):
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
+    if chat_engine is None:
+        async def error_stream():
+            yield f"data: {{'chunk': '服务初始化中...'}}\n\n"
+            yield f"data: {{'done': true}}\n\n"
+        return StreamingResponse(error_stream(), media_type="text/event-stream")
+
     async def event_stream():
-        yield f"data: {{'chunk': '思考中...'}}\n\n"
-        yield f"data: {{'done': true}}\n\n"
+        async for chunk in chat_engine.stream_answer(request.question, request.context):
+            yield chunk
+
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.websocket("/ws/heatmap")
 async def websocket_heatmap(websocket: WebSocket):
-    client_id = None
     await websocket.accept()
+    heartbeat_task = asyncio.create_task(ws_manager.heartbeat_loop(websocket))
+
+    async def cleanup():
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
+        await ws_manager.disconnect(websocket)
+
     try:
         while True:
-            data = await websocket.receive_json()
+            try:
+                data = await websocket.receive_json()
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+                continue
+            except RuntimeError:
+                # FastAPI raises RuntimeError when connection is closed during receive
+                break
+
             action = data.get("action")
+            msg_type = data.get("type")
+
             if action == "subscribe":
                 markets = data.get("markets", [])
                 for m in markets:
                     await ws_manager.connect(websocket, m)
-                client_id = ",".join(markets)
-            elif data.get("type") == "ping":
-                await websocket.send_json({"type": "pong"})
+                await websocket.send_json({"type": "subscribed", "markets": markets})
+
+            elif action == "unsubscribe":
+                markets = data.get("markets", [])
+                for m in markets:
+                    await ws_manager.disconnect(websocket, m)
+                await websocket.send_json({"type": "unsubscribed", "markets": markets})
+
+            elif msg_type == "ping":
+                await websocket.send_json({"type": "pong", "timestamp": data.get("timestamp")})
+
     except WebSocketDisconnect:
-        if client_id:
-            for m in client_id.split(","):
-                await ws_manager.disconnect(websocket, m)
+        pass
+    except Exception:
+        LOG.exception("websocket error")
+    finally:
+        await cleanup()
+
+
+from pydantic import BaseModel
+
+class ConfigUpdate(BaseModel):
+    key: str
+    value: str
+
+def _provider_key_status() -> dict:
+    """Return whether each provider's API key is available (env or config_store)."""
+    status = {}
+    for name, spec in PROVIDERS.items():
+        env_set = bool(os.environ.get(spec.api_key_env))
+        store_set = bool(config_store and config_store.get(spec.api_key_env))
+        status[name] = {
+            "configured": env_set or store_set,
+            "source": "env" if env_set else ("store" if store_set else "none"),
+            "api_key_env": spec.api_key_env,
+        }
+    return status
+
+
+@app.get("/api/config")
+async def get_config():
+    if config_store is None:
+        return {"env_override": True, "keys": {}, "providers": {}}
+    return {
+        "env_override": bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("KIMI_API_KEY") or os.environ.get("BAILIAN_API_KEY")),
+        "keys": config_store.get_masked(),
+        "providers": _provider_key_status(),
+    }
+
+@app.post("/api/config")
+async def update_config(body: ConfigUpdate):
+    if config_store is None:
+        return JSONResponse({"error": "config store not initialized"}, status_code=503)
+    config_store.set(body.key, body.value)
+    return {"ok": True}
+
+
+# ── Model / Provider management ──
+
+@app.get("/api/models")
+async def get_models():
+    return {"providers": get_provider_models()}
+
+
+@app.get("/api/models/current")
+async def get_current_model():
+    if chat_engine is None:
+        return {"provider": "deepseek", "model": "deepseek-chat", "display_name": "DeepSeek"}
+    spec = PROVIDERS.get(chat_engine.config.provider, PROVIDERS["deepseek"])
+    return {
+        "provider": chat_engine.config.provider,
+        "model": chat_engine.config.model,
+        "display_name": spec.display_name,
+    }
+
+
+@app.post("/api/models/switch")
+async def switch_model(body: ModelSwitchRequest):
+    if chat_engine is None:
+        return JSONResponse({"error": "chat engine not initialized"}, status_code=503)
+    if body.provider not in PROVIDERS:
+        return JSONResponse({"error": f"unknown provider: {body.provider}"}, status_code=400)
+    chat_engine.switch_provider(body.provider, body.model)
+    # Persist selection
+    if config_store:
+        config_store.set("ACTIVE_PROVIDER", body.provider)
+        config_store.set("ACTIVE_MODEL", chat_engine.config.model)
+    return {"ok": True, "provider": body.provider, "model": chat_engine.config.model}
+
+
+# Serve frontend static files (SPA — fallback to index.html for all non-API routes)
+app.mount("/", StaticFiles(directory=ROOT / "frontend" / "dist", html=True), name="static")

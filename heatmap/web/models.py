@@ -20,3 +20,8 @@ class HeatmapResponse(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     context: dict = Field(default_factory=dict)
+
+
+class ModelSwitchRequest(BaseModel):
+    provider: str
+    model: str | None = None

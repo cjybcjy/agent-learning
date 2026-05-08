@@ -15,6 +15,7 @@ class RawMessage:
     posted_at: datetime
     fetched_at: datetime
     id: int | None = None
+    market: str = "crypto"
 
 @dataclass
 class Mention:
@@ -50,10 +51,10 @@ class Store:
     async def insert_message(self, m: RawMessage) -> int:
         async with self._write_lock:
             cur = await self._db.execute(
-                "INSERT INTO raw_messages(platform,channel,author_id,content,posted_at,fetched_at)"
-                " VALUES (?,?,?,?,?,?)",
+                "INSERT INTO raw_messages(platform,channel,author_id,content,posted_at,fetched_at,market)"
+                " VALUES (?,?,?,?,?,?,?)",
                 (m.platform, m.channel, m.author_id, m.content,
-                 m.posted_at.isoformat(), m.fetched_at.isoformat()),
+                 m.posted_at.isoformat(), m.fetched_at.isoformat(), m.market),
             )
             await self._db.commit()
             return cur.lastrowid
@@ -61,10 +62,10 @@ class Store:
     async def insert_message_with_mentions(self, m: RawMessage, mentions: list[Mention]) -> int:
         async with self._write_lock:
             cur = await self._db.execute(
-                "INSERT INTO raw_messages(platform,channel,author_id,content,posted_at,fetched_at)"
-                " VALUES (?,?,?,?,?,?)",
+                "INSERT INTO raw_messages(platform,channel,author_id,content,posted_at,fetched_at,market)"
+                " VALUES (?,?,?,?,?,?,?)",
                 (m.platform, m.channel, m.author_id, m.content,
-                 m.posted_at.isoformat(), m.fetched_at.isoformat()),
+                 m.posted_at.isoformat(), m.fetched_at.isoformat(), m.market),
             )
             mid = cur.lastrowid
             if mentions:
@@ -166,6 +167,8 @@ class Store:
     async def get_rollup_heatmap(
         self, granularity: str, market: str, limit: int, cursor: str | None
     ) -> tuple[list[dict], str | None]:
+        if granularity == "week":
+            return await self._get_rollup_weekly_heatmap(market, limit, cursor)
         table = {"30min": "rollup_30min", "4h": "rollup_4h", "day": "rollup_daily"}.get(granularity, "rollup_30min")
         time_col = "window_start" if granularity != "day" else "date"
         params: list = []
@@ -174,7 +177,6 @@ class Store:
             where_clauses.append("market = ?")
             params.append(market)
         if cursor:
-            # cursor format: "window_start|symbol"
             parts = cursor.split("|")
             if len(parts) == 2:
                 where_clauses.append(f"({time_col} < ? OR ({time_col} = ? AND symbol > ?))")
@@ -193,7 +195,51 @@ class Store:
             next_cursor = f"{last[1]}|{last[0]}"
         return items, next_cursor
 
+    async def _get_rollup_weekly_heatmap(
+        self, market: str, limit: int, cursor: str | None
+    ) -> tuple[list[dict], str | None]:
+        params: list = []
+        where_clauses = []
+        if market != "all":
+            where_clauses.append("market = ?")
+            params.append(market)
+        if cursor:
+            parts = cursor.split("|")
+            if len(parts) == 2:
+                where_clauses.append("(strftime('%Y-W%W', date) < ? OR (strftime('%Y-W%W', date) = ? AND symbol > ?))")
+                params.extend([parts[0], parts[0], parts[1]])
+        where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        sql = (
+            f"SELECT symbol, strftime('%Y-W%W', date) as window_start, market, "
+            f"SUM(mention_count) as mention_count, SUM(weighted_score) as weighted_score, SUM(source_count) as source_count "
+            f"FROM rollup_daily {where_sql} GROUP BY symbol, strftime('%Y-W%W', date), market "
+            f"ORDER BY window_start DESC, symbol ASC LIMIT ?"
+        )
+        params.append(limit + 1)
+        cur = await self._db.execute(sql, tuple(params))
+        rows = await cur.fetchall()
+        cols = [desc[0] for desc in cur.description]
+        items = [dict(zip(cols, row)) for row in rows[:limit]]
+        next_cursor = None
+        if len(rows) > limit:
+            last = rows[limit]
+            next_cursor = f"{last[1]}|{last[0]}"
+        return items, next_cursor
+
     async def get_rollup_trend(self, symbol: str, granularity: str, days: int = 7) -> list[dict]:
+        if granularity == "week":
+            from datetime import datetime, timedelta, timezone
+            since = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+            cur = await self._db.execute(
+                "SELECT symbol, strftime('%Y-W%W', date) as window_start, SUM(mention_count) as mention_count, "
+                "SUM(weighted_score) as weighted_score, SUM(source_count) as source_count "
+                "FROM rollup_daily WHERE symbol = ? AND date >= ? "
+                "GROUP BY strftime('%Y-W%W', date) ORDER BY window_start ASC",
+                (symbol, since),
+            )
+            rows = await cur.fetchall()
+            cols = [desc[0] for desc in cur.description]
+            return [dict(zip(cols, row)) for row in rows]
         table = {"30min": "rollup_30min", "4h": "rollup_4h", "day": "rollup_daily"}.get(granularity, "rollup_30min")
         time_col = "window_start" if granularity != "day" else "date"
         from datetime import datetime, timedelta, timezone

@@ -2,14 +2,22 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 import httpx
 
+from pydantic import ValidationError
+
 from heatmap.aggregator.gates import compute_instant_alpha
 from heatmap.ai.cost_guard import CostGuard
+from heatmap.ai.llm_client import LLMClient, PROVIDERS
+from heatmap.ai.models import AISignalResult
 from heatmap.ai.prompts import build_prompt
 from heatmap.config import AIConfig
 from heatmap.store.dao import Store
+
+if TYPE_CHECKING:
+    from heatmap.config_store import ConfigStore
 
 LOG = logging.getLogger("heatmap.ai.signal_engine")
 
@@ -21,14 +29,41 @@ class SignalEngine:
         cost_guard: CostGuard,
         config: AIConfig,
         ws_manager=None,
+        config_store: "ConfigStore | None" = None,
     ):
         self.store = store
         self.cost_guard = cost_guard
         self.config = config
         self.ws_manager = ws_manager
+        self.config_store = config_store
         self._client = httpx.AsyncClient(timeout=60.0)
+        self._llm = self._build_llm_client()
+
+    def _build_llm_client(self) -> LLMClient:
+        """Build LLMClient from current config. API key resolved lazily at request time."""
+        return LLMClient(
+            provider=self.config.provider,
+            model=self.config.model,
+            config_store=self.config_store,
+        )
+
+    def _resolve_api_key(self, env_var: str) -> str | None:
+        """Look up API key: explicit env var > config_store > generic fallback."""
+        key = os.environ.get(env_var)
+        if not key and self.config_store:
+            key = self.config_store.get(env_var)
+        return key
+
+    def switch_provider(self, provider: str, model: str | None = None) -> None:
+        """Switch to a different provider at runtime."""
+        spec = PROVIDERS.get(provider, PROVIDERS["deepseek"])
+        self.config = self.config.model_copy_with_provider(provider, model)
+        api_key = self._resolve_api_key(spec.api_key_env)
+        self._llm = LLMClient(provider=provider, model=self.config.model, api_key=api_key)
+        LOG.info("Switched AI provider to %s (model=%s)", provider, self.config.model)
 
     async def close(self):
+        await self._llm.close()
         await self._client.aclose()
 
     async def check_and_trigger(
@@ -70,22 +105,33 @@ class SignalEngine:
         sources = f"{current['source_count']} channels"
         prompt = build_prompt(symbol, instant_alpha, sources, top_posts)
 
-        # 8. Call LLM
-        raw_response = await self._call_llm(prompt)
+        # 8. Call LLM via unified client
+        raw_response = await self._llm.chat(prompt)
         if raw_response is None:
+            LOG.error("LLM call failed for %s @ %s", symbol, window_start)
             return None
 
-        # 9. Parse JSON with retry
+        # 9. Parse JSON with retry + Pydantic validation
         parsed = await self._parse_json(raw_response)
-        if parsed is None:
-            parsed = {"parse_error": True, "raw_analysis": raw_response}
+        parse_error = parsed is None
+        if parse_error:
+            # Fallback: construct a minimal result so downstream code is uniform
+            parsed = AISignalResult(
+                anomaly_score=0.0,
+                sentiment_shift="neutral",
+                sentiment_confidence=0.0,
+                key_driver="[PARSE_ERROR] 无法解析模型输出",
+                key_driver_confidence=0.0,
+                driver_keywords=[],
+                reasoning="",
+            )
 
         # 10. Record call
         await self.cost_guard.record_call(symbol, window_start, self.config.model)
 
         # 11. Insert into ai_signals
         created_at = datetime.now(timezone.utc).isoformat()
-        await self._insert_signal(symbol, window_start, created_at, parsed, raw_response)
+        await self._insert_signal(symbol, window_start, created_at, parsed, raw_response, parse_error)
 
         # 12. Broadcast via WebSocket
         signal_payload = {
@@ -93,10 +139,10 @@ class SignalEngine:
             "symbol": symbol,
             "window_start": window_start,
             "market": market,
-            "anomaly_score": parsed.get("anomaly_score"),
-            "sentiment_shift": parsed.get("sentiment_shift"),
-            "key_driver": parsed.get("key_driver"),
-            "driver_keywords": parsed.get("driver_keywords", []),
+            "anomaly_score": parsed.anomaly_score,
+            "sentiment_shift": parsed.sentiment_shift,
+            "key_driver": parsed.key_driver,
+            "driver_keywords": parsed.driver_keywords,
             "instant_alpha": f"{instant_alpha:.0%}",
             "timestamp": created_at,
         }
@@ -117,87 +163,35 @@ class SignalEngine:
         # Filter same time slot
         return [(ws, cnt) for ws, cnt in all_history if ws[11:16] == time_slot and ws != window_start]
 
-    async def _call_llm(self, prompt: str) -> str | None:
-        api_key = os.environ.get(self.config.api_key_env)
-        if not api_key:
-            LOG.error("API key not found in env var %s", self.config.api_key_env)
-            return None
-
-        if "claude" in self.config.model.lower():
-            return await self._call_claude(prompt, api_key)
-        else:
-            return await self._call_openai(prompt, api_key)
-
-    async def _call_claude(self, prompt: str, api_key: str) -> str | None:
-        url = "https://api.anthropic.com/v1/messages"
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        payload = {
-            "model": self.config.model,
-            "max_tokens": 1024,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        try:
-            resp = await self._client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            content = data.get("content", [])
-            if content:
-                return content[0].get("text", "")
-            return None
-        except Exception:
-            LOG.exception("Claude API call failed")
-            return None
-
-    async def _call_openai(self, prompt: str, api_key: str) -> str | None:
-        url = "https://api.openai.com/v1/chat/completions"
-        headers = {"authorization": f"Bearer {api_key}", "content-type": "application/json"}
-        payload = {
-            "model": self.config.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
-            "max_tokens": 1024,
-        }
-        try:
-            resp = await self._client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            choices = data.get("choices", [])
-            if choices:
-                return choices[0].get("message", {}).get("content", "")
-            return None
-        except Exception:
-            LOG.exception("OpenAI API call failed")
-            return None
-
-    async def _parse_json(self, raw: str, retries: int = 1) -> dict | None:
+    async def _parse_json(self, raw: str, retries: int = 1) -> AISignalResult | None:
+        """Extract JSON from markdown fences, parse, and validate with Pydantic."""
         for attempt in range(retries + 1):
             try:
-                # Try to extract JSON from markdown code blocks
                 text = raw.strip()
                 if text.startswith("```"):
                     lines = text.splitlines()
-                    # Remove first and last fence if present
                     if lines[0].startswith("```"):
                         lines = lines[1:]
                     if lines and lines[-1].startswith("```"):
                         lines = lines[:-1]
                     text = "\n".join(lines).strip()
-                return json.loads(text)
-            except json.JSONDecodeError:
+                data = json.loads(text)
+                # Pydantic strict validation — catches out-of-range scores,
+                # invalid sentiment literals, missing required fields, etc.
+                return AISignalResult.model_validate(data)
+            except (json.JSONDecodeError, ValidationError) as exc:
+                if isinstance(exc, ValidationError):
+                    LOG.warning("LLM output failed Pydantic validation: %s", exc)
                 if attempt < retries:
                     LOG.warning("JSON parse failed, retrying...")
                     continue
-                LOG.error("JSON parse failed after %d attempts", retries + 1)
+                LOG.error("JSON parse/validation failed after %d attempts", retries + 1)
                 return None
         return None
 
     async def _insert_signal(
         self, symbol: str, window_start: str, created_at: str,
-        parsed: dict, raw_analysis: str
+        parsed: AISignalResult, raw_analysis: str, parse_error: bool = False,
     ) -> None:
         await self.store._db.execute(
             "INSERT INTO ai_signals"
@@ -209,13 +203,13 @@ class SignalEngine:
                 window_start,
                 self.config.model,
                 created_at,
-                parsed.get("anomaly_score"),
-                parsed.get("sentiment_shift"),
-                parsed.get("sentiment_confidence"),
-                parsed.get("key_driver"),
-                parsed.get("key_driver_confidence"),
-                json.dumps(parsed.get("driver_keywords", []), ensure_ascii=False),
-                raw_analysis if not parsed.get("parse_error") else f"[PARSE_ERROR] {raw_analysis}",
+                parsed.anomaly_score,
+                parsed.sentiment_shift,
+                parsed.sentiment_confidence,
+                parsed.key_driver,
+                parsed.key_driver_confidence,
+                json.dumps(parsed.driver_keywords, ensure_ascii=False),
+                raw_analysis if not parse_error else f"[PARSE_ERROR] {raw_analysis}",
             ),
         )
         await self.store._db.commit()

@@ -6,18 +6,18 @@ class RollupEngine:
         self.store = store
 
     async def compute_rollup_30min(self, window_start: str, window_end: str) -> None:
-        """Aggregate mentions for a 30min window"""
+        """Aggregate mentions for a 30min window, grouped by symbol and market."""
         cur = await self.store._db.execute(
-            "SELECT m.symbol, COUNT(*) as cnt, COUNT(DISTINCT r.channel) as src_cnt "
+            "SELECT m.symbol, r.market, COUNT(*) as cnt, COUNT(DISTINCT r.channel) as src_cnt "
             "FROM mentions m JOIN raw_messages r ON r.id = m.message_id "
             "WHERE r.posted_at >= ? AND r.posted_at < ? "
-            "GROUP BY m.symbol",
+            "GROUP BY m.symbol, r.market",
             (window_start, window_end)
         )
         rows = await cur.fetchall()
-        for symbol, cnt, src_cnt in rows:
+        for symbol, market, cnt, src_cnt in rows:
             await self.store.insert_rollup_30min(
-                symbol=symbol, window_start=window_start, market="crypto",
+                symbol=symbol, window_start=window_start, market=market,
                 mention_count=cnt, weighted_score=float(cnt), source_count=src_cnt
             )
 

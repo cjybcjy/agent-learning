@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS raw_messages (
   author_id TEXT,
   content TEXT NOT NULL,
   posted_at TEXT NOT NULL,   -- ISO8601 UTC
-  fetched_at TEXT NOT NULL
+  fetched_at TEXT NOT NULL,
+  market TEXT NOT NULL DEFAULT 'crypto'
 );
 CREATE INDEX IF NOT EXISTS idx_raw_posted_at ON raw_messages(posted_at);
 CREATE INDEX IF NOT EXISTS idx_raw_platform ON raw_messages(platform);

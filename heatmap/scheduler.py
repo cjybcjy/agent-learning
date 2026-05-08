@@ -13,6 +13,9 @@ from heatmap.ai.cost_guard import CostGuard
 from heatmap.ai.signal_engine import SignalEngine
 from heatmap.collectors.telegram import TelegramCollector
 from heatmap.collectors.discord import DiscordCollector
+from heatmap.collectors.xueqiu import XueqiuCollector
+from heatmap.collectors.rate_limiter import RateLimiter
+from heatmap.collectors.proxy_pool import ProxyPool
 from heatmap.store.writer import BatchWriter
 from heatmap.web.websocket import ws_manager
 
@@ -133,11 +136,14 @@ async def serve():
         asyncio.create_task(AIScheduler(store, signal_engine, rollup_completion).run()),
     ]
 
-    # Legacy collectors write directly to store for now
+    # All collectors use Queue + BatchWriter architecture
+    limiter = RateLimiter(thresholds.rate_limits)
+    proxy_pool = ProxyPool(thresholds.proxies)
+
     if sources.telegram.channels:
         LOG.info("starting telegram collector for %d channels", len(sources.telegram.channels))
         tasks.append(asyncio.create_task(
-            TelegramCollector(store, extractor, sources.telegram.channels).run()
+            TelegramCollector(extractor, sources.telegram.channels, queue, market="crypto").run()
         ))
     else:
         LOG.warning("config/sources.yaml: telegram.channels is empty")
@@ -146,10 +152,14 @@ async def serve():
         watch = {int(cid) for g in sources.discord.guilds for cid in g.channel_ids}
         LOG.info("starting discord collector watching %d channel(s)", len(watch))
         tasks.append(asyncio.create_task(
-            DiscordCollector(store, extractor, watch).run()
+            DiscordCollector(extractor, watch, queue, market="crypto").run()
         ))
     else:
         LOG.warning("config/sources.yaml: discord.guilds is empty")
+
+    LOG.info("starting xueqiu collector")
+    xq = XueqiuCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool)
+    tasks.append(asyncio.create_task(xq.run()))
 
     LOG.info("scheduler ready: %d tasks running. Ctrl+C to stop.", len(tasks))
     try:

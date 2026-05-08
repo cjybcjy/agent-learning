@@ -5,6 +5,7 @@ import HeatmapTable from '../components/HeatmapTable'
 import AIChatPanel from '../components/AIChatPanel'
 import TrendChart from '../components/TrendChart'
 import AlertBanner from '../components/AlertBanner'
+import SettingsPanel from '../components/SettingsPanel'
 
 const MARKETS = [
   { key: 'all', label: '全部' },
@@ -35,12 +36,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null)
   const [chatContext, setChatContext] = useState<any>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const loadData = useCallback(async (append = false) => {
     setLoading(true)
     try {
-      const g = granularity === 'week' ? 'day' : granularity
-      const res = await fetchHeatmap({ granularity: g, market, limit: 50, cursor: append ? cursor || undefined : undefined })
+      const res = await fetchHeatmap({ granularity, market, limit: 50, cursor: append ? cursor || undefined : undefined })
       const newItems: HeatmapItem[] = (res.items || []).map((r: any, idx: number) => ({
         symbol: r.symbol,
         rank: append ? (items.length + idx + 1) : (idx + 1),
@@ -163,6 +164,21 @@ export default function Dashboard() {
         }}>
           {connected ? '已连接' : '连接中...'}
         </span>
+
+        <button
+          onClick={() => setSettingsOpen(true)}
+          style={{
+            padding: '4px 12px',
+            border: '1px solid #ddd',
+            background: '#fff',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontSize: 13,
+          }}
+          title="设置"
+        >
+          ⚙️
+        </button>
       </header>
 
       <AlertBanner alerts={alerts} />
@@ -184,8 +200,10 @@ export default function Dashboard() {
       </main>
 
       {selectedSymbol && (
-        <TrendChart symbol={selectedSymbol} granularity={granularity === 'week' ? 'day' : granularity} />
+        <TrendChart symbol={selectedSymbol} granularity={granularity} />
       )}
+
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )
 }
