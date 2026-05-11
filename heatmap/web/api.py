@@ -1,6 +1,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import asyncio
@@ -13,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from heatmap.config import load_thresholds
 from heatmap.config_store import ConfigStore
 from heatmap.store.dao import Store
-from heatmap.web.models import HeatmapResponse, HeatmapItem, ChatRequest, ModelSwitchRequest
+from heatmap.web.models import HeatmapResponse, HeatmapItem, MarketStatsResponse, MarketStats, ChatRequest, ModelSwitchRequest
 from heatmap.web.websocket import ws_manager
 from heatmap.ai.chat_engine import ChatEngine
 from heatmap.ai.llm_client import get_provider_models, PROVIDERS
@@ -54,6 +55,21 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+def _compute_confidence(source_count: int, last_updated: str | None) -> float:
+    """Compute confidence score (0-100) from source_count and freshness."""
+    source_score = min(source_count / 3.0, 1.0) * 100
+    if last_updated:
+        try:
+            dt = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
+            hours_since = (datetime.now(timezone.utc) - dt).total_seconds() / 3600
+            freshness_score = max(0.0, 1.0 - hours_since / 24.0)
+        except (ValueError, TypeError):
+            freshness_score = 0.5
+    else:
+        freshness_score = 0.5
+    return round(source_score * freshness_score, 1)
+
+
 @app.get("/api/heatmap", response_model=HeatmapResponse)
 async def get_heatmap(
     granularity: str = Query("30min", pattern="^(30min|4h|day|week)$"),
@@ -70,6 +86,12 @@ async def get_heatmap(
             rank=idx + 1,
             mention_count=r["mention_count"],
             weighted_score=r["weighted_score"],
+            source_count=r.get("source_count", 0),
+            last_updated=r.get("window_start"),
+            confidence_score=_compute_confidence(
+                r.get("source_count", 0),
+                r.get("window_start"),
+            ),
         )
         for idx, r in enumerate(items_raw)
     ]
@@ -103,6 +125,17 @@ async def get_symbols(market: str = Query("all")):
         return {"market": market, "symbols": []}
     symbols = await store.get_symbols_by_market(market)
     return {"market": market, "symbols": symbols}
+
+
+@app.get("/api/market-stats", response_model=MarketStatsResponse)
+async def get_market_stats():
+    if store is None:
+        return MarketStatsResponse(markets={})
+    stats = await store.get_market_stats()
+    markets = {
+        m: MarketStats(**s) for m, s in stats.items()
+    }
+    return MarketStatsResponse(markets=markets)
 
 
 @app.post("/api/chat")
