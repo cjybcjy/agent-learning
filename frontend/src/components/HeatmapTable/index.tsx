@@ -32,6 +32,22 @@ function isSingleSourceRisk(item: HeatmapItem): boolean {
   return item.source_count === 1 && item.mention_count > 0 && item.rank <= 10
 }
 
+function getRelativeTime(isoStr?: string): string {
+  if (!isoStr) return '--'
+  try {
+    const dt = new Date(isoStr.replace('Z', '+00:00'))
+    const diffMin = Math.floor((Date.now() - dt.getTime()) / 60000)
+    if (diffMin < 1) return '刚刚'
+    if (diffMin < 60) return `${diffMin}分钟前`
+    const diffHour = Math.floor(diffMin / 60)
+    if (diffHour < 24) return `${diffHour}小时前`
+    const diffDay = Math.floor(diffHour / 24)
+    return `${diffDay}天前`
+  } catch {
+    return '--'
+  }
+}
+
 export default function HeatmapTable({ items, loading, cursor, onLoadMore, onSelectSymbol, onAskAI }: Props) {
   const getAlphaColor = (alpha?: string) => {
     if (!alpha) return '#666'
@@ -59,6 +75,7 @@ export default function HeatmapTable({ items, loading, cursor, onLoadMore, onSel
             <th style={{ padding: '8px 12px' }}>标的</th>
             <th style={{ padding: '8px 12px' }}>提及数</th>
             <th style={{ padding: '8px 12px' }}>来源</th>
+            <th style={{ padding: '8px 12px' }}>更新时间</th>
             <th style={{ padding: '8px 12px' }}>置信度</th>
             <th style={{ padding: '8px 12px' }}>即时α</th>
             <th style={{ padding: '8px 12px' }}>AI</th>
@@ -90,6 +107,9 @@ export default function HeatmapTable({ items, loading, cursor, onLoadMore, onSel
                 </td>
                 <td style={{ padding: '8px 12px' }}>{item.mention_count}</td>
                 <td style={{ padding: '8px 12px' }}>{getSourceLabel(item.source_count)}</td>
+                <td style={{ padding: '8px 12px', color: '#888', fontSize: 12 }}>
+                  {getRelativeTime(item.last_updated)}
+                </td>
                 <td style={{ padding: '8px 12px' }}>
                   <span style={{ color: conf.color, fontWeight: 600, fontSize: 12 }}>
                     {item.confidence_score !== undefined && item.confidence_score !== null

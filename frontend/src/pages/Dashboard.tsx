@@ -235,7 +235,23 @@ export default function Dashboard() {
     return result
   }, [marketStats])
 
-  const currentMarketStat = marketStats[market]
+  // Aggregate stats for 'all' market
+  const allMarketStat = useMemo(() => {
+    const markets = Object.values(marketStats)
+    if (markets.length === 0) return undefined
+    const sources = [...new Set(markets.flatMap(s => s.sources))]
+    return {
+      symbol_count: markets.reduce((sum, s) => sum + s.symbol_count, 0),
+      total_mentions: markets.reduce((sum, s) => sum + s.total_mentions, 0),
+      source_count: sources.length,
+      sources,
+      last_updated: markets.reduce((latest, s) =>
+        s.last_updated && (!latest || s.last_updated > latest) ? s.last_updated : latest, '' as string | null
+      ),
+    } as MarketStats
+  }, [marketStats])
+
+  const currentMarketStat = market === 'all' ? allMarketStat : marketStats[market]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
