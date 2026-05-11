@@ -10,6 +10,10 @@ export function useWebSocket(url: string, markets: string[], options?: UseWebSoc
   const [connected, setConnected] = useState(false)
   const reconnectDelay = useRef(1000)
   const wasConnected = useRef(false)
+  const optionsRef = useRef(options)
+  const marketsRef = useRef(markets)
+  optionsRef.current = options
+  marketsRef.current = markets
 
   const connect = useCallback(() => {
     const socket = new WebSocket(url)
@@ -18,11 +22,14 @@ export function useWebSocket(url: string, markets: string[], options?: UseWebSoc
     socket.onopen = () => {
       setConnected(true)
       reconnectDelay.current = 1000
-      socket.send(JSON.stringify({ action: 'subscribe', markets }))
+      // Subscribe with current markets array (from ref, not closure)
+      socket.send(JSON.stringify({
+        action: 'subscribe',
+        markets: marketsRef.current,
+      }))
 
-      // Trigger reconnect callback if this is a reconnection
-      if (wasConnected.current && options?.onReconnect) {
-        options.onReconnect()
+      if (wasConnected.current && optionsRef.current?.onReconnect) {
+        optionsRef.current.onReconnect()
       }
       wasConnected.current = true
 
@@ -49,11 +56,14 @@ export function useWebSocket(url: string, markets: string[], options?: UseWebSoc
         connect()
       }, reconnectDelay.current)
     }
-  }, [url, markets, options])
+  }, [url])
 
   useEffect(() => {
+    // When markets change, reconnect to re-subscribe with new markets
     connect()
-    return () => ws.current?.close()
+    return () => {
+      ws.current?.close()
+    }
   }, [connect])
 
   return { messages, connected }
