@@ -2,3 +2,13 @@ telegram:
   channels: []
 discord:
   guilds: []
+
+# New source switches (set to false to disable a collector)
+jqka: true
+cls: true
+aastocks: true
+futu: true
+reddit: true
+stocktwits: true
+coingecko: true
+lunarcrush: true

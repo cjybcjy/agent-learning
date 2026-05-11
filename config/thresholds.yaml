@@ -14,7 +14,37 @@ ai:
 # 限速配置
 rate_limits:
   "xueqiu.com": 1.0
+  "eastmoney.com": 2.0
+  "push2.eastmoney.com": 3.0
   "api.twitter.com": 2.0
+  "10jqka.com.cn": 1.5
+  "stockpage.10jqka.com.cn": 1.5
+  "cls.cn": 2.0
+  "aastocks.com": 1.0
+  "futunn.com": 0.5
+  "reddit.com": 2.0
+  "api.stocktwits.com": 2.0
+  "api.coingecko.com": 1.0
+  "lunarcrush.com": 0.3
 
 # 代理池
 proxies: []
+
+# 熔断器配置
+circuit_breaker:
+  sleep_minutes: 15
+  threshold: 0.2
+  duration_seconds: 120
+
+# 来源权重（可覆盖采集器默认值）
+source_weights:
+  xueqiu: 0.9
+  eastmoney: 0.7
+  jqka: 1.0
+  cls: 0.8
+  aastocks: 0.9
+  futu: 0.7
+  reddit: 0.4
+  stocktwits: 0.6
+  coingecko: 0.7
+  lunarcrush: 0.5
