@@ -272,6 +272,36 @@ class Store:
         rows = await cur.fetchall()
         return [row[0] for row in rows]
 
+    async def get_market_stats(self) -> dict[str, dict]:
+        """Return per-market stats: symbol count, total messages, active sources, last update."""
+        cur = await self._db.execute(
+            "SELECT market, COUNT(DISTINCT symbol) as symbol_cnt, "
+            "SUM(mention_count) as total_mentions, "
+            "MAX(source_count) as max_sources, "
+            "MAX(window_start) as last_updated "
+            "FROM rollup_30min GROUP BY market"
+        )
+        rows = await cur.fetchall()
+        stats = {}
+        for row in rows:
+            market, sym_cnt, mentions, max_src, last_upd = row
+            # Get distinct source platforms for this market
+            src_cur = await self._db.execute(
+                "SELECT DISTINCT r.platform FROM raw_messages r "
+                "JOIN mentions m ON m.message_id = r.id "
+                "WHERE r.market = ?",
+                (market,)
+            )
+            sources = [s[0] for s in await src_cur.fetchall()]
+            stats[market] = {
+                "symbol_count": sym_cnt or 0,
+                "total_mentions": mentions or 0,
+                "source_count": len(sources),
+                "sources": sources,
+                "last_updated": last_upd,
+            }
+        return stats
+
     async def get_top_posts(self, symbol: str, window_start: str, window_end: str, limit: int = 10) -> list[dict]:
         cur = await self._db.execute(
             "SELECT r.content, r.platform, r.channel, r.posted_at, r.author_id "
