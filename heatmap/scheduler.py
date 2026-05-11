@@ -14,6 +14,16 @@ from heatmap.ai.signal_engine import SignalEngine
 from heatmap.collectors.telegram import TelegramCollector
 from heatmap.collectors.discord import DiscordCollector
 from heatmap.collectors.xueqiu import XueqiuCollector
+from heatmap.collectors.eastmoney import EastmoneyCollector
+from heatmap.collectors.jqka import JqkaCollector
+from heatmap.collectors.cls import ClsCollector
+from heatmap.collectors.aastocks import AastocksCollector
+from heatmap.collectors.futu import FutuCollector
+from heatmap.collectors.reddit import RedditCollector
+from heatmap.collectors.stocktwits import StocktwitsCollector
+from heatmap.collectors.coingecko import CoingeckoCollector
+from heatmap.collectors.lunarcrush import LunarcrushCollector
+from heatmap.collectors.circuit_breaker import CircuitBreaker
 from heatmap.collectors.rate_limiter import RateLimiter
 from heatmap.collectors.proxy_pool import ProxyPool
 from heatmap.store.writer import BatchWriter
@@ -140,6 +150,14 @@ async def serve():
     limiter = RateLimiter(thresholds.rate_limits)
     proxy_pool = ProxyPool(thresholds.proxies)
 
+    # Initialize circuit breaker
+    cb_config = getattr(thresholds, 'circuit_breaker', None)
+    circuit_breaker = CircuitBreaker(
+        sleep_minutes=getattr(cb_config, 'sleep_minutes', 15) if cb_config else 15,
+        threshold=getattr(cb_config, 'threshold', 0.2) if cb_config else 0.2,
+        duration_seconds=getattr(cb_config, 'duration_seconds', 120) if cb_config else 120,
+    )
+
     if sources.telegram.channels:
         LOG.info("starting telegram collector for %d channels", len(sources.telegram.channels))
         tasks.append(asyncio.create_task(
@@ -160,6 +178,54 @@ async def serve():
     LOG.info("starting xueqiu collector")
     xq = XueqiuCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool)
     tasks.append(asyncio.create_task(xq.run()))
+
+    LOG.info("starting eastmoney collector")
+    em = EastmoneyCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool)
+    tasks.append(asyncio.create_task(em.run()))
+
+    # A-share additional: jqka + cls
+    LOG.info("starting jqka collector")
+    tasks.append(asyncio.create_task(
+        JqkaCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker).run()
+    ))
+
+    LOG.info("starting cls collector")
+    tasks.append(asyncio.create_task(
+        ClsCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker).run()
+    ))
+
+    # HK: aastocks + futu
+    LOG.info("starting aastocks collector")
+    tasks.append(asyncio.create_task(
+        AastocksCollector(extractor, queue, market="hk", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker).run()
+    ))
+
+    LOG.info("starting futu collector")
+    tasks.append(asyncio.create_task(
+        FutuCollector(extractor, queue, market="hk", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker).run()
+    ))
+
+    # US: reddit + stocktwits
+    LOG.info("starting reddit collector")
+    tasks.append(asyncio.create_task(
+        RedditCollector(extractor, queue, market="us", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker).run()
+    ))
+
+    LOG.info("starting stocktwits collector")
+    tasks.append(asyncio.create_task(
+        StocktwitsCollector(extractor, queue, market="us", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker).run()
+    ))
+
+    # Crypto: coingecko + lunarcrush
+    LOG.info("starting coingecko collector")
+    tasks.append(asyncio.create_task(
+        CoingeckoCollector(extractor, queue, market="crypto", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker).run()
+    ))
+
+    LOG.info("starting lunarcrush collector")
+    tasks.append(asyncio.create_task(
+        LunarcrushCollector(extractor, queue, market="crypto", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker).run()
+    ))
 
     LOG.info("scheduler ready: %d tasks running. Ctrl+C to stop.", len(tasks))
     try:
