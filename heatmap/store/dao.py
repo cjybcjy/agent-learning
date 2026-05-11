@@ -30,6 +30,7 @@ class QueuedMessage:
     """Queue element: RawMessage + pre-extracted mentions for batch write."""
     raw: RawMessage
     mentions: list[Mention] | None = None
+    source_weight: float = 0.5
 
 class Store:
     def __init__(self, db_path: Path):
