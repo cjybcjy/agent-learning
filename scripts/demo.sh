@@ -50,6 +50,19 @@ start_web() {
 }
 
 start_scheduler() {
+    # Prevent duplicate scheduler processes
+    if pgrep -f "heatmap.scheduler" >/dev/null 2>&1; then
+        log_warn "Scheduler already running, skipping start"
+        return
+    fi
+    log_info "Starting Scheduler (data collection + AI signals)"
+    $PYTHON -m heatmap.scheduler &
+    SCHEDULER_PID=$!
+    log_ok "Scheduler PID: $SCHEDULER_PID"
+    echo $SCHEDULER_PID > /tmp/heatmap-scheduler.pid
+}
+
+start_scheduler() {
     log_info "Starting Scheduler (data collection + AI signals)"
     $PYTHON -m heatmap.scheduler &
     SCHEDULER_PID=$!
