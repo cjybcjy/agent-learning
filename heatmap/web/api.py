@@ -86,6 +86,11 @@ async def get_heatmap(
     if store is None:
         return HeatmapResponse(items=[], next_cursor=None)
     items_raw, next_cursor = await store.get_rollup_heatmap(granularity, market, limit, cursor)
+
+    # Fetch daily scores for buy/sell factors (alpha)
+    symbols = [r["symbol"] for r in items_raw]
+    daily_scores = await store.get_latest_daily_scores(symbols)
+
     items = [
         HeatmapItem(
             symbol=r["symbol"],
@@ -98,6 +103,7 @@ async def get_heatmap(
                 r.get("source_count", 0),
                 r.get("window_start"),
             ),
+            instant_alpha=daily_scores.get(r["symbol"], {}).get("alpha"),
         )
         for idx, r in enumerate(items_raw)
     ]

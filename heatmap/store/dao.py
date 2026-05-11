@@ -123,6 +123,25 @@ class Store:
         row = await cur.fetchone()
         return row[0] if row else None
 
+    async def get_latest_daily_scores(self, symbols: list[str]) -> dict[str, dict]:
+        """Get latest daily score (alpha, beta, composite) for a batch of symbols."""
+        if not symbols:
+            return {}
+        placeholders = ",".join(["?" for _ in symbols])
+        cur = await self._db.execute(
+            f"SELECT ds.symbol, ds.alpha, ds.beta, ds.composite, ds.date "
+            f"FROM daily_scores ds "
+            f"INNER JOIN (SELECT symbol, MAX(date) as max_date FROM daily_scores "
+            f"WHERE symbol IN ({placeholders}) GROUP BY symbol) latest "
+            f"ON ds.symbol = latest.symbol AND ds.date = latest.max_date",
+            symbols,
+        )
+        rows = await cur.fetchall()
+        return {
+            row[0]: {"alpha": row[1], "beta": row[2], "composite": row[3], "date": row[4]}
+            for row in rows
+        }
+
     async def insert_rollup_30min(
         self, symbol: str, window_start: str, market: str,
         mention_count: int, weighted_score: float, source_count: int

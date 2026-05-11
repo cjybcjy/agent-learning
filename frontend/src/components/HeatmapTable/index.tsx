@@ -49,14 +49,6 @@ function getRelativeTime(isoStr?: string): string {
 }
 
 export default function HeatmapTable({ items, loading, cursor, onLoadMore, onSelectSymbol, onAskAI }: Props) {
-  const getAlphaColor = (alpha?: string) => {
-    if (!alpha) return '#666'
-    const val = parseFloat(alpha)
-    if (val > 0) return '#2e7d32'
-    if (val < 0) return '#c62828'
-    return '#666'
-  }
-
   const getSourceLabel = (count: number) => {
     if (count === 0) return <span style={{ color: '#bbb', fontSize: 12 }}>--</span>
     if (count === 1) return <span style={{ background: '#fff3e0', color: '#e65100', padding: '1px 8px', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>1源</span>
@@ -77,7 +69,7 @@ export default function HeatmapTable({ items, loading, cursor, onLoadMore, onSel
             <th style={{ padding: '8px 12px' }}>来源</th>
             <th style={{ padding: '8px 12px' }}>更新时间</th>
             <th style={{ padding: '8px 12px' }}>置信度</th>
-            <th style={{ padding: '8px 12px' }}>即时α</th>
+            <th style={{ padding: '8px 12px' }}>买卖因子</th>
             <th style={{ padding: '8px 12px' }}>AI</th>
             <th style={{ padding: '8px 12px' }}>操作</th>
           </tr>
@@ -119,8 +111,23 @@ export default function HeatmapTable({ items, loading, cursor, onLoadMore, onSel
                   {' '}
                   <span style={{ color: conf.color, fontSize: 11 }}>{conf.text}</span>
                 </td>
-                <td style={{ padding: '8px 12px', color: getAlphaColor(item.instant_alpha), fontWeight: 600 }}>
-                  {item.instant_alpha || '-'}
+                <td style={{ padding: '8px 12px' }}>
+                  {(() => {
+                    const a = item.instant_alpha
+                    if (a === undefined || a === null) return <span style={{ color: '#bbb' }}>--</span>
+                    const val = typeof a === 'string' ? parseFloat(a) : a
+                    if (val === 0) return <span style={{ color: '#666', fontSize: 12 }}>观望</span>
+                    if (val > 0) return (
+                      <span style={{ background: '#e8f5e9', color: '#2e7d32', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600 }}>
+                        {'买入'} +{val.toFixed(1)}
+                      </span>
+                    )
+                    return (
+                      <span style={{ background: '#ffebee', color: '#c62828', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600 }}>
+                        {'卖出'} {val.toFixed(1)}
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td style={{ padding: '8px 12px' }}>
                   {item.anomaly_score !== undefined && item.anomaly_score !== null ? (
