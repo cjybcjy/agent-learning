@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -60,7 +61,12 @@ def _compute_confidence(source_count: int, last_updated: str | None) -> float:
     source_score = min(source_count / 3.0, 1.0) * 100
     if last_updated:
         try:
-            dt = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
+            # Handle ISO week format (e.g. "2024-W01") — not supported by
+            # fromisoformat on Python < 3.11
+            if re.match(r'^\d{4}-W\d{2}$', last_updated):
+                dt = datetime.strptime(last_updated + '-1', '%Y-W%W-%w').replace(tzinfo=timezone.utc)
+            else:
+                dt = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
             hours_since = (datetime.now(timezone.utc) - dt).total_seconds() / 3600
             freshness_score = max(0.0, 1.0 - hours_since / 24.0)
         except (ValueError, TypeError):

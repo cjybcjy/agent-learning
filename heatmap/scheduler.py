@@ -150,12 +150,12 @@ async def serve():
     limiter = RateLimiter(thresholds.rate_limits)
     proxy_pool = ProxyPool(thresholds.proxies)
 
-    # Initialize circuit breaker
-    cb_config = getattr(thresholds, 'circuit_breaker', None)
+    # Initialize circuit breaker from config
+    cb = thresholds.circuit_breaker
     circuit_breaker = CircuitBreaker(
-        sleep_minutes=getattr(cb_config, 'sleep_minutes', 15) if cb_config else 15,
-        threshold=getattr(cb_config, 'threshold', 0.2) if cb_config else 0.2,
-        duration_seconds=getattr(cb_config, 'duration_seconds', 120) if cb_config else 120,
+        sleep_minutes=cb.sleep_minutes,
+        threshold=cb.threshold,
+        duration_seconds=cb.duration_seconds,
     )
 
     if sources.telegram.channels:
@@ -176,11 +176,11 @@ async def serve():
         LOG.warning("config/sources.yaml: discord.guilds is empty")
 
     LOG.info("starting xueqiu collector")
-    xq = XueqiuCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool)
+    xq = XueqiuCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker)
     tasks.append(asyncio.create_task(xq.run()))
 
     LOG.info("starting eastmoney collector")
-    em = EastmoneyCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool)
+    em = EastmoneyCollector(extractor, queue, market="a_share", limiter=limiter, proxy_pool=proxy_pool, circuit_breaker=circuit_breaker)
     tasks.append(asyncio.create_task(em.run()))
 
     # A-share additional: jqka + cls

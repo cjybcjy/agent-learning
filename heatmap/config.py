@@ -24,6 +24,12 @@ class AIConfig(BaseModel):
         )
 
 
+class CircuitBreakerConfig(BaseModel):
+    sleep_minutes: float = 15.0
+    threshold: float = 0.2
+    duration_seconds: float = 120.0
+
+
 class Thresholds(BaseModel):
     stage_a_top_n: int
     stage_b_top_n: int
@@ -32,6 +38,8 @@ class Thresholds(BaseModel):
     ai: AIConfig = AIConfig()
     rate_limits: dict[str, float] = {}
     proxies: list[str] = []
+    circuit_breaker: CircuitBreakerConfig = CircuitBreakerConfig()
+    source_weights: dict[str, float] = {}
 
 
 class DiscordGuild(BaseModel):

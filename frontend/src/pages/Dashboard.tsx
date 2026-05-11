@@ -108,6 +108,12 @@ export default function Dashboard() {
   const marketStats = state.status === 'data' || state.status === 'loading_more' || state.status === 'empty'
     ? state.marketStats : {}
 
+  // Refs for values used inside loadData to avoid dependency churn
+  const cursorRef = useRef(cursor)
+  cursorRef.current = cursor
+  const itemsLenRef = useRef(items.length)
+  itemsLenRef.current = items.length
+
   const loadData = useCallback(async (append: boolean) => {
     // Abort previous request on non-append loads
     if (!append && abortRef.current) {
@@ -126,12 +132,12 @@ export default function Dashboard() {
     try {
       const res = await fetchHeatmap({
         granularity, market, limit: 50,
-        cursor: append ? cursor || undefined : undefined,
+        cursor: append ? cursorRef.current || undefined : undefined,
         signal: controller.signal,
       })
       const newItems: HeatmapItem[] = (res.items || []).map((r: any, idx: number) => ({
         symbol: r.symbol,
-        rank: append ? (items.length + idx + 1) : (idx + 1),
+        rank: append ? (itemsLenRef.current + idx + 1) : (idx + 1),
         mention_count: r.mention_count,
         weighted_score: r.weighted_score,
         source_count: r.source_count ?? 0,
@@ -162,11 +168,11 @@ export default function Dashboard() {
       console.error('fetchHeatmap failed', e)
       dispatch({ type: 'LOAD_ERROR', message: e?.message || 'Failed to load' })
     }
-  }, [granularity, market, cursor, items.length])
+  }, [granularity, market])
 
   useEffect(() => {
     loadData(false)
-  }, [granularity, market])
+  }, [loadData])
 
   const handleReconnect = useCallback(() => {
     dispatch({ type: 'RESET', epoch: ++epochRef.current })
