@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from simpleeval import simple_eval
+
 from sentinel.mgfs.factor_plugin import (
     AlertLevel,
     BaseFactorPlugin,
@@ -109,10 +111,37 @@ class MGFSOrchestrator:
     def _check_circuit_breakers(
         self, factor_scores: dict[str, FactorScore], policy_rating: str
     ) -> tuple[list[dict[str, Any]], AlertLevel]:
-        """Check circuit breaker rules. Stubbed — full simpleeval implementation in Task 5."""
         triggered: list[dict[str, Any]] = []
         alert_level = AlertLevel.GREEN_PASS
+        context = self._build_eval_context(factor_scores, policy_rating)
+
+        for cb in self.circuit_breakers:
+            if not cb.get("enabled", False):
+                continue
+            try:
+                if simple_eval(cb["rule"], names=context):
+                    triggered.append(cb)
+                    cb_level = AlertLevel(cb.get("alert_level", "yellow_warning"))
+                    if cb_level in (AlertLevel.HARD_VETO, AlertLevel.SOFT_VETO):
+                        alert_level = cb_level
+                    elif alert_level == AlertLevel.GREEN_PASS:
+                        alert_level = cb_level
+            except Exception:
+                logger.warning("Circuit breaker rule error: %s", cb["rule"])
+
         return triggered, alert_level
+
+    def _build_eval_context(
+        self, factor_scores: dict[str, FactorScore], policy_rating: str
+    ) -> dict[str, Any]:
+        ctx: dict[str, Any] = {"policy_rating": policy_rating}
+        for key, score in factor_scores.items():
+            ctx[f"{key}_score"] = score.score
+            ctx[f"{key}_normalized"] = score.normalized_score
+            for detail_key, detail_val in score.details.items():
+                if isinstance(detail_val, (int, float, bool, str)):
+                    ctx[f"{key}_{detail_key}"] = detail_val
+        return ctx
 
     def _classify_rating(
         self, final_score: float, alert_level: AlertLevel

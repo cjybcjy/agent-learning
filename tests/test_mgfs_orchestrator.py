@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from simpleeval import simple_eval
+
 from sentinel.domain.models import Market
-from sentinel.mgfs.factor_plugin import BaseFactorPlugin, FactorScore, TargetInfo
+from sentinel.mgfs.factor_plugin import AlertLevel, BaseFactorPlugin, FactorScore, TargetInfo
 from sentinel.mgfs.orchestrator import MGFSOrchestrator
 
 
@@ -83,3 +85,94 @@ def test_classify_rating_fallback():
     rating, action = orchestrator._classify_rating(0.0, AlertLevel.GREEN_PASS)
     assert rating == "Avoid"
     assert action == "回避"
+
+
+def test_orchestrator_policy_multiplier_applied():
+    orchestrator = MGFSOrchestrator(
+        plugins=[MockMoatPlugin()],
+        scoring_weights={"moat": 1.0},
+        policy_multipliers={"core_support": 1.2, "neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {"min_score": 0.0, "label": "Avoid", "action": "avoid"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target, policy_rating="core_support")
+
+    assert decision.policy_multiplier == 1.2
+    assert decision.final_score == 96.0  # 80 * 1.2
+
+
+def test_orchestrator_circuit_breaker_triggers():
+    orchestrator = MGFSOrchestrator(
+        plugins=[MockMoatPlugin()],
+        scoring_weights={"moat": 1.0},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[
+            {
+                "enabled": True,
+                "rule": "moat_score < 100",
+                "action": "soft_veto",
+                "alert_level": "soft_veto",
+                "message": "护城河评分过低",
+            }
+        ],
+        rating_thresholds=[
+            {"min_score": 90.0, "label": "Strong Buy", "action": "buy"},
+            {"min_score": 0.0, "label": "Avoid", "action": "avoid"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+
+    assert len(decision.circuit_breakers_triggered) == 1
+    assert decision.alert_level == AlertLevel.SOFT_VETO
+    assert decision.rating == "Avoid"
+
+
+def test_orchestrator_hard_veto_forces_avoid():
+    orchestrator = MGFSOrchestrator(
+        plugins=[MockMoatPlugin()],
+        scoring_weights={"moat": 1.0},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[
+            {
+                "enabled": True,
+                "rule": "policy_rating == 'veto'",
+                "action": "hard_veto",
+                "alert_level": "hard_veto",
+                "message": "一票否决",
+            }
+        ],
+        rating_thresholds=[
+            {"min_score": 0.0, "label": "Avoid", "action": "avoid"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target, policy_rating="veto")
+
+    assert decision.alert_level == AlertLevel.HARD_VETO
+    assert decision.rating == "Avoid"
+    assert "一票否决" in decision.action
+
+
+def test_orchestrator_rating_classification():
+    orchestrator = MGFSOrchestrator(
+        plugins=[MockMoatPlugin()],
+        scoring_weights={"moat": 1.0},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {"min_score": 90.0, "label": "Strong Buy", "action": "重仓出击"},
+            {"min_score": 75.0, "label": "Accumulate", "action": "分批建仓"},
+            {"min_score": 60.0, "label": "Hold/Watch", "action": "等待拐点"},
+            {"min_score": 0.0, "label": "Avoid", "action": "回避"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+
+    # Score 80 falls into Accumulate (75-90)
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+    assert decision.rating == "Accumulate"
+    assert decision.action == "分批建仓"
