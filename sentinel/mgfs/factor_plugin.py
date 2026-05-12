@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import StrEnum
+from strenum import StrEnum
 from typing import Any
 
 from sentinel.domain.models import Market

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentinel.domain.models import Market
 from sentinel.mgfs.factor_plugin import (
     AlertLevel,
