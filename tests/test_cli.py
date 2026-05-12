@@ -21,7 +21,7 @@ def test_cli_run_market_command(settings, monkeypatch) -> None:
     monkeypatch.setenv("SENTINEL_CONFIG_DIR", str(settings.config_dir))
     monkeypatch.setenv("SENTINEL_DATA_DIR", str(settings.data_dir))
 
-    result = runner.invoke(cli_app, ["--market", "A股"])
+    result = runner.invoke(cli_app, ["run", "--market", "A股"])
 
     assert result.exit_code == 0
     assert "collected 1 ranked snapshot for A股" in result.stdout
