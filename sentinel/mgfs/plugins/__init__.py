@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentinel.mgfs.plugins.timing import TimingFactorPlugin
 from sentinel.mgfs.plugins.valuation import ValuationFactorPlugin
 

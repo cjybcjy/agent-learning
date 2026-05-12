@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentinel.domain.models import Market
 from sentinel.mgfs.factor_plugin import TargetInfo
 from sentinel.mgfs.plugins.valuation import ValuationFactorPlugin
