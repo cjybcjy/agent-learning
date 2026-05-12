@@ -67,3 +67,19 @@ def test_orchestrator_plugin_failure_returns_fallback():
     assert decision.factor_scores["broken"].score == 0.0
     assert decision.factor_scores["broken"].confidence == 0.0
     assert "评估失败" in decision.factor_scores["broken"].warnings[0]
+
+
+def test_classify_rating_fallback():
+    orchestrator = MGFSOrchestrator(
+        plugins=[],
+        scoring_weights={},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {"min_score": 60.0, "label": "Hold", "action": "wait"},
+        ],
+    )
+    from sentinel.mgfs.factor_plugin import AlertLevel
+    rating, action = orchestrator._classify_rating(0.0, AlertLevel.GREEN_PASS)
+    assert rating == "Avoid"
+    assert action == "回避"

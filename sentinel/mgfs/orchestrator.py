@@ -14,6 +14,8 @@ from sentinel.mgfs.factor_plugin import (
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["InvestmentDecision", "MGFSOrchestrator"]
+
 
 @dataclass(slots=True)
 class InvestmentDecision:
@@ -41,6 +43,11 @@ class MGFSOrchestrator:
     ) -> None:
         self.plugins = {p.factor_key: p for p in plugins}
         self.scoring_weights = scoring_weights
+        plugin_keys = set(self.plugins.keys())
+        weight_keys = set(self.scoring_weights.keys())
+        missing_weights = plugin_keys - weight_keys
+        if missing_weights:
+            logger.warning("Plugins without scoring weights: %s", missing_weights)
         self.policy_multipliers = policy_multipliers
         self.circuit_breakers = circuit_breakers
         self.rating_thresholds = sorted(
@@ -102,6 +109,7 @@ class MGFSOrchestrator:
     def _check_circuit_breakers(
         self, factor_scores: dict[str, FactorScore], policy_rating: str
     ) -> tuple[list[dict[str, Any]], AlertLevel]:
+        """Check circuit breaker rules. Stubbed — full simpleeval implementation in Task 5."""
         triggered: list[dict[str, Any]] = []
         alert_level = AlertLevel.GREEN_PASS
         return triggered, alert_level
