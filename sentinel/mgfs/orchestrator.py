@@ -60,6 +60,22 @@ class MGFSOrchestrator:
         self, target: TargetInfo, policy_rating: str = "neutral"
     ) -> InvestmentDecision:
         factor_scores = self._run_plugins(target)
+
+        # All plugins crashed → spec-mandated error rating
+        if factor_scores and all(s.confidence == 0.0 for s in factor_scores.values()):
+            return InvestmentDecision(
+                target=target,
+                generated_at=datetime.now(tz=timezone.utc),
+                factor_scores=factor_scores,
+                raw_total=0.0,
+                policy_multiplier=self.policy_multipliers.get(policy_rating, 1.0),
+                final_score=0.0,
+                rating="Error",
+                action="系统异常，人工复核",
+                circuit_breakers_triggered=[],
+                alert_level=AlertLevel.YELLOW_WARNING,
+            )
+
         raw_total = self._compute_raw_total(factor_scores)
         multiplier = self.policy_multipliers.get(policy_rating, 1.0)
         final_score = raw_total * multiplier

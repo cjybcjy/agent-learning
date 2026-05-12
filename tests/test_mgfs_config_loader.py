@@ -68,3 +68,9 @@ rating_thresholds:
 
     assert isinstance(orchestrator, MGFSOrchestrator)
     assert "moat" in orchestrator.plugins
+
+
+def test_load_plugin_rejects_non_subclass():
+    with pytest.raises(TypeError):
+        from sentinel.mgfs.config_loader import _load_plugin
+        _load_plugin("sentinel.domain.models.Market")

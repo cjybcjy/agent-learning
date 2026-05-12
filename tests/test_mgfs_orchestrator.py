@@ -240,3 +240,38 @@ def test_invalid_alert_level_defaults_to_yellow():
     decision = orchestrator.evaluate(target, policy_rating="neutral")
     # Should not crash, should default to yellow_warning
     assert len(decision.circuit_breakers_triggered) == 1
+    assert decision.alert_level == AlertLevel.YELLOW_WARNING
+
+
+def test_all_plugins_crash_returns_error_rating():
+    class BrokenMoat(BaseFactorPlugin):
+        factor_key = "moat"
+        factor_name = "护城河"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            raise RuntimeError("boom")
+
+    class BrokenToken(BaseFactorPlugin):
+        factor_key = "token_metrics"
+        factor_name = "Token消耗"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            raise ValueError("kapow")
+
+    orchestrator = MGFSOrchestrator(
+        plugins=[BrokenMoat(), BrokenToken()],
+        scoring_weights={"moat": 0.5, "token_metrics": 0.5},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[{"min_score": 0.0, "label": "Avoid", "action": "avoid"}],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+
+    assert decision.rating == "Error"
+    assert decision.action == "系统异常，人工复核"
+    assert decision.alert_level == AlertLevel.YELLOW_WARNING
+    assert decision.raw_total == 0.0
+    assert decision.final_score == 0.0
+    assert decision.factor_scores["moat"].confidence == 0.0
+    assert decision.factor_scores["token_metrics"].confidence == 0.0
