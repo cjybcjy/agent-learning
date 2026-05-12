@@ -7,6 +7,8 @@ from sentinel.domain.models import Market
 from sentinel.mgfs.orchestrator import InvestmentDecision
 from sentinel.storage.db import Database
 
+__all__ = ["MGFSRepository"]
+
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS mgfs_decisions (
     evaluated_at TIMESTAMP NOT NULL,
