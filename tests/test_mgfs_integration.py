@@ -13,27 +13,27 @@ def test_end_to_end_with_realistic_config(settings, monkeypatch):
     mgfs_config.write_text("""
 version: "1.0"
 modules:
-  moat:
+  valuation:
     enabled: true
     class_path: "sentinel.mgfs.plugins.valuation.ValuationFactorPlugin"
     config: {}
-  token_metrics:
+  timing:
     enabled: true
     class_path: "sentinel.mgfs.plugins.timing.TimingFactorPlugin"
     config: {}
 scoring_formula:
-  moat: { weight: 0.5 }
-  token_metrics: { weight: 0.5 }
+  valuation: { weight: 0.5 }
+  timing: { weight: 0.5 }
 policy_multiplier:
   core_support: { multiplier: 1.2 }
   neutral: { multiplier: 1.0 }
 circuit_breakers:
-  min_moat:
+  min_valuation:
     enabled: true
-    rule: "moat_score < 30"
+    rule: "valuation_score < 30"
     action: "soft_veto"
     alert_level: "soft_veto"
-    message: "护城河评分过低"
+    message: "估值评分过低"
 rating_thresholds:
   strong_buy: { min_score: 90.0, label: "Strong Buy", action: "重仓出击" }
   accumulate: { min_score: 75.0, label: "Accumulate", action: "分批建仓" }
@@ -52,4 +52,7 @@ rating_thresholds:
     assert "投资权衡与决策说明书" in result.stdout
     assert "600519" in result.stdout
     assert "A股" in result.stdout
-    assert "最终得分" in result.stdout
+    assert "最终得分: 50.0" in result.stdout
+    assert "评级: Avoid" in result.stdout
+    assert "建议动作: 回避" in result.stdout
+    assert "告警级别: green_pass" in result.stdout
