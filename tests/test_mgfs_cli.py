@@ -1,8 +1,22 @@
 from typer.testing import CliRunner
 
 from main import app as cli_app
+from sentinel.mgfs.factor_plugin import BaseFactorPlugin, FactorScore, TargetInfo
 
 runner = CliRunner()
+
+
+class MockEvaluatePlugin(BaseFactorPlugin):
+    factor_key = "mock_eval"
+    factor_name = "模拟评估"
+
+    def evaluate(self, target: TargetInfo) -> FactorScore:
+        return FactorScore(
+            factor_key=self.factor_key,
+            factor_name=self.factor_name,
+            score=75.0,
+            details={"note": "mock for CLI test"},
+        )
 
 
 def test_cli_evaluate_command_exists():
@@ -20,12 +34,12 @@ def test_cli_evaluate_runs_with_mock_plugins(settings, monkeypatch):
     mgfs_config.write_text("""
 version: "1.0"
 modules:
-  valuation:
+  mock_eval:
     enabled: true
-    class_path: "sentinel.mgfs.plugins.valuation.ValuationFactorPlugin"
+    class_path: "tests.test_mgfs_cli.MockEvaluatePlugin"
     config: {}
 scoring_formula:
-  valuation: { weight: 1.0 }
+  mock_eval: { weight: 1.0 }
 policy_multiplier:
   neutral: { multiplier: 1.0 }
 circuit_breakers: {}
@@ -42,4 +56,4 @@ rating_thresholds:
 
     assert result.exit_code == 0
     assert "投资权衡与决策说明书" in result.stdout
-    assert "估值水位" in result.stdout
+    assert "模拟评估" in result.stdout

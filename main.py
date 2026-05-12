@@ -54,7 +54,11 @@ def evaluate(
 
     settings = AppSettings()
     config_path = settings.resolved_config_dir / "mgfs_config.yaml"
-    config = load_mgfs_config(config_path)
+    try:
+        config = load_mgfs_config(config_path)
+    except FileNotFoundError:
+        typer.echo("错误: 未找到 mgfs_config.yaml，请检查配置目录", err=True)
+        raise typer.Exit(1)
     orchestrator = build_orchestrator(config)
 
     target = TargetInfo(
