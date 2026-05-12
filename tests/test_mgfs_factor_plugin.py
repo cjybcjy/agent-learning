@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from sentinel.domain.models import Market
 from sentinel.mgfs.factor_plugin import (
     AlertLevel,
@@ -37,3 +39,22 @@ def test_base_factor_plugin_is_abstract():
     import inspect
     assert inspect.isabstract(BaseFactorPlugin)
     assert "evaluate" in BaseFactorPlugin.__abstractmethods__
+
+
+def test_target_info_is_immutable():
+    target = TargetInfo(symbol="600519", market=Market.A_SHARE, asset_class="equity")
+    with pytest.raises(AttributeError):
+        target.symbol = "000001"
+
+
+def test_health_check_default():
+    class DummyPlugin(BaseFactorPlugin):
+        factor_key = "dummy"
+        factor_name = "Dummy"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(factor_key="dummy", factor_name="Dummy", score=0.0)
+
+    plugin = DummyPlugin()
+    result = plugin.health_check()
+    assert result == {"ready": True, "missing_dependencies": []}
