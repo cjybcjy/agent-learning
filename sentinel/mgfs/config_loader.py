@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import logging
 from pathlib import Path
 
@@ -13,6 +14,17 @@ logger = logging.getLogger(__name__)
 
 
 def load_mgfs_config(path: Path) -> dict:
+    """Load and parse an MGFS YAML configuration file.
+
+    Args:
+        path: Path to the YAML configuration file.
+
+    Returns:
+        A dictionary representing the parsed YAML configuration.
+
+    Raises:
+        FileNotFoundError: If the configuration file does not exist.
+    """
     if not path.exists():
         raise FileNotFoundError(f"MGFS config not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
@@ -20,6 +32,16 @@ def load_mgfs_config(path: Path) -> dict:
 
 
 def build_orchestrator(config: dict) -> MGFSOrchestrator:
+    """Build an MGFSOrchestrator instance from a parsed configuration dict.
+
+    Args:
+        config: Dictionary loaded by load_mgfs_config containing modules,
+            scoring_formula, policy_multiplier, circuit_breakers, and
+            rating_thresholds.
+
+    Returns:
+        An initialized MGFSOrchestrator with loaded plugins and settings.
+    """
     modules = config.get("modules", {})
     scoring_formula = config.get("scoring_formula", {})
     policy_multipliers = _extract_policy_multipliers(
@@ -55,6 +77,8 @@ def _load_plugin(class_path: str) -> BaseFactorPlugin:
     module_name, class_name = class_path.rsplit(".", 1)
     module = importlib.import_module(module_name)
     cls = getattr(module, class_name)
+    if not inspect.isclass(cls) or not issubclass(cls, BaseFactorPlugin):
+        raise TypeError(f"{class_path} is not a BaseFactorPlugin subclass")
     return cls()
 
 

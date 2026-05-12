@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from sentinel.mgfs.config_loader import load_mgfs_config
+from sentinel.mgfs.config_loader import build_orchestrator, load_mgfs_config
 from sentinel.mgfs.factor_plugin import BaseFactorPlugin, FactorScore, TargetInfo
+from sentinel.mgfs.orchestrator import MGFSOrchestrator
 
 
 class TestMoatPlugin(BaseFactorPlugin):
@@ -29,9 +30,9 @@ scoring_formula:
   moat: { weight: 1.0 }
 policy_multiplier:
   neutral: { multiplier: 1.0 }
-circuit_breakers: []
+circuit_breakers: {}
 rating_thresholds:
-  - { min_score: 0.0, label: "Avoid", action: "avoid" }
+  avoid: { min_score: 0.0, label: "Avoid", action: "avoid" }
 """, encoding="utf-8")
 
     config = load_mgfs_config(config_path)
@@ -42,3 +43,28 @@ rating_thresholds:
 def test_load_mgfs_config_missing_file_raises():
     with pytest.raises(FileNotFoundError):
         load_mgfs_config(Path("/tmp/nonexistent_mgfs_config.yaml"))
+
+
+def test_build_orchestrator_from_config():
+    config_path = Path("/tmp/test_mgfs_config2.yaml")
+    config_path.write_text("""
+version: "1.0"
+modules:
+  moat:
+    enabled: true
+    class_path: "tests.test_mgfs_config_loader.TestMoatPlugin"
+    config: {}
+scoring_formula:
+  moat: { weight: 1.0 }
+policy_multiplier:
+  neutral: { multiplier: 1.0 }
+circuit_breakers: {}
+rating_thresholds:
+  avoid: { min_score: 0.0, label: "Avoid", action: "avoid" }
+""", encoding="utf-8")
+
+    config = load_mgfs_config(config_path)
+    orchestrator = build_orchestrator(config)
+
+    assert isinstance(orchestrator, MGFSOrchestrator)
+    assert "moat" in orchestrator.plugins
