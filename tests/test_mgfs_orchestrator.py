@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from simpleeval import simple_eval
-
 from sentinel.domain.models import Market
 from sentinel.mgfs.factor_plugin import AlertLevel, BaseFactorPlugin, FactorScore, TargetInfo
 from sentinel.mgfs.orchestrator import MGFSOrchestrator
@@ -176,3 +174,69 @@ def test_orchestrator_rating_classification():
     decision = orchestrator.evaluate(target, policy_rating="neutral")
     assert decision.rating == "Accumulate"
     assert decision.action == "分批建仓"
+
+
+def test_disabled_circuit_breaker_does_not_trigger():
+    orchestrator = MGFSOrchestrator(
+        plugins=[MockMoatPlugin()],
+        scoring_weights={"moat": 1.0},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[
+            {
+                "enabled": False,
+                "rule": "moat_score < 100",
+                "action": "soft_veto",
+                "alert_level": "soft_veto",
+                "message": "should not trigger",
+            }
+        ],
+        rating_thresholds=[{"min_score": 0.0, "label": "Avoid", "action": "avoid"}],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+    assert len(decision.circuit_breakers_triggered) == 0
+    assert decision.alert_level == AlertLevel.GREEN_PASS
+
+
+def test_malformed_rule_logs_warning():
+    orchestrator = MGFSOrchestrator(
+        plugins=[MockMoatPlugin()],
+        scoring_weights={"moat": 1.0},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[
+            {
+                "enabled": True,
+                "rule": "this is not valid python",
+                "action": "soft_veto",
+                "alert_level": "soft_veto",
+                "message": "malformed",
+            }
+        ],
+        rating_thresholds=[{"min_score": 0.0, "label": "Avoid", "action": "avoid"}],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+    # Should not crash, should not trigger
+    assert len(decision.circuit_breakers_triggered) == 0
+
+
+def test_invalid_alert_level_defaults_to_yellow():
+    orchestrator = MGFSOrchestrator(
+        plugins=[MockMoatPlugin()],
+        scoring_weights={"moat": 1.0},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[
+            {
+                "enabled": True,
+                "rule": "moat_score < 100",
+                "action": "soft_veto",
+                "alert_level": "invalid_level",
+                "message": "bad level",
+            }
+        ],
+        rating_thresholds=[{"min_score": 0.0, "label": "Avoid", "action": "avoid"}],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+    # Should not crash, should default to yellow_warning
+    assert len(decision.circuit_breakers_triggered) == 1

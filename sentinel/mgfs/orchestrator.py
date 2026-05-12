@@ -121,7 +121,14 @@ class MGFSOrchestrator:
             try:
                 if simple_eval(cb["rule"], names=context):
                     triggered.append(cb)
-                    cb_level = AlertLevel(cb.get("alert_level", "yellow_warning"))
+                    try:
+                        cb_level = AlertLevel(cb.get("alert_level", "yellow_warning"))
+                    except ValueError:
+                        logger.warning(
+                            "Invalid alert_level '%s' in circuit breaker, defaulting to yellow_warning",
+                            cb.get("alert_level"),
+                        )
+                        cb_level = AlertLevel.YELLOW_WARNING
                     if cb_level in (AlertLevel.HARD_VETO, AlertLevel.SOFT_VETO):
                         alert_level = cb_level
                     elif alert_level == AlertLevel.GREEN_PASS:
@@ -134,10 +141,15 @@ class MGFSOrchestrator:
     def _build_eval_context(
         self, factor_scores: dict[str, FactorScore], policy_rating: str
     ) -> dict[str, Any]:
-        ctx: dict[str, Any] = {"policy_rating": policy_rating}
+        ctx: dict[str, Any] = {}
+        # Only primitive types allowed in simpleeval context
+        if isinstance(policy_rating, (int, float, bool, str)):
+            ctx["policy_rating"] = policy_rating
         for key, score in factor_scores.items():
-            ctx[f"{key}_score"] = score.score
-            ctx[f"{key}_normalized"] = score.normalized_score
+            if isinstance(score.score, (int, float, bool, str)):
+                ctx[f"{key}_score"] = score.score
+            if isinstance(score.normalized_score, (int, float, bool, str)):
+                ctx[f"{key}_normalized"] = score.normalized_score
             for detail_key, detail_val in score.details.items():
                 if isinstance(detail_val, (int, float, bool, str)):
                     ctx[f"{key}_{detail_key}"] = detail_val
