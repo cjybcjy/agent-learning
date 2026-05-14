@@ -111,7 +111,7 @@ companies:
     base_score:
       brand_premium: { score: 95, note: "社交货币属性，议价能力极强" }
       franchise_barrier: { score: 90, note: "地理标志保护 + 产能壁垒" }
-      policy_alignment: { score: 85, note: "消费品，非政策敏感行业" }
+      switching_cost: { score: 88, note: "用户口味依赖，转换成本极高" }
       cost_advantage: { score: 70, note: "毛利率高但原料成本有波动" }
     
   "000001":  # 平安银行
@@ -120,7 +120,7 @@ companies:
     base_score:
       brand_premium: { score: 60, note: "品牌认知度中等" }
       franchise_barrier: { score: 75, note: "金融牌照壁垒" }
-      policy_alignment: { score: 70, note: "受金融监管政策影响大" }
+      network_effect: { score: 55, note: "网点规模效应，但无网络效应" }
       cost_advantage: { score: 65, note: "资金成本优势一般" }
 ```
 
@@ -130,10 +130,11 @@ companies:
 |------|------|---------|
 | `brand_premium` | 品牌溢价力 | 消费者心智占有率、定价权 |
 | `franchise_barrier` | 特许经营权与行政壁垒 | 牌照、专利、资源开采权 |
-| `policy_alignment` | 政策契合度 | 所属赛道是否受政策支持 |
+| `switching_cost` | 转换成本 | 用户迁移难度、生态锁定 |
+| `network_effect` | 网络效应 | 用户规模带来的边际价值递增 |
 | `cost_advantage` | 成本优势 | 规模效应、工艺壁垒、资源禀赋 |
 
-**计算方式：** 四个子指标取算术平均，作为 Base Score（0-100）。
+**计算方式：** 五个子指标取算术平均，作为 Base Score（0-100）。
 
 ### 3.4 动态增量分 (Trend Score)
 
@@ -163,15 +164,15 @@ companies:
 
 **数据源：** DuckDB 表 `safety_metrics`（API 自动抓取聚合）
 
-**适用指标：**
+**适用指标（Structural Safety — 基本面结构安全，非价格估值安全）：**
 
-| 指标 | 计算逻辑 | 预警阈值 |
-|------|---------|---------|
-| `pe_percentile` | PE 历史百分位（近 5 年） | > 90% 危险 |
-| `pb_percentile` | PB 历史百分位（近 5 年） | > 90% 危险 |
-| `debt_ratio_deterioration` | 资产负债率环比恶化 | 连续 2 季上升 |
-| `goodwill_ratio` | 商誉占净资产比重 | > 30% 危险 |
-| `operating_cashflow` | 经营现金流 / 净利润 | < 1.0 预警 |
+| 指标 | 计算逻辑 | 预警阈值 | 说明 |
+|------|---------|---------|------|
+| `debt_ratio_deterioration` | 资产负债率环比恶化 | 连续 2 季上升 | 杠杆侵蚀安全边际 |
+| `goodwill_ratio` | 商誉占净资产比重 | > 30% 危险 | 并购暴雷风险 |
+| `operating_cashflow` | 经营现金流 / 净利润 | < 1.0 预警 | 利润含金量不足 |
+
+**注意：** `pe_percentile` 和 `pb_percentile` 属于估值水位（Price Safety），由模块 B（FinancialsPlugin / 估值监控）负责，**不在** Moat 插件中重复计算。
 
 **计算方式：** 偏离度越严重扣分越多，输出 Safety Score（0-100）。
 
@@ -377,7 +378,8 @@ def _aggregate_confidence(self, factor_scores: dict[str, FactorScore]) -> float:
 |--------|---------|---------|---------|---------|
 | `brand_premium` | `companies.{symbol}.base_score.brand_premium.score` | int | 0-100 | 半年 |
 | `franchise_barrier` | `companies.{symbol}.base_score.franchise_barrier.score` | int | 0-100 | 半年 |
-| `policy_alignment` | `companies.{symbol}.base_score.policy_alignment.score` | int | 0-100 | 季度 |
+| `switching_cost` | `companies.{symbol}.base_score.switching_cost.score` | int | 0-100 | 半年 |
+| `network_effect` | `companies.{symbol}.base_score.network_effect.score` | int | 0-100 | 半年 |
 | `cost_advantage` | `companies.{symbol}.base_score.cost_advantage.score` | int | 0-100 | 半年 |
 | `sector_policy_multiplier` | `policy_whitelist.yaml:sectors.{sector}.multiplier` | float | 0.5-1.2 | 季度 |
 
@@ -393,8 +395,6 @@ def _aggregate_confidence(self, factor_scores: dict[str, FactorScore]) -> float:
 | `dau_growth` | 日活增速 | Dune Analytics | 日 | Crypto |
 | `burn_rate` | 链上燃烧率 | Dune / Glassnode | 日 | Crypto |
 | `active_address_growth` | 活跃地址增速 | Glassnode | 日 | Crypto |
-| `pe_percentile` | PE 历史百分位 | Wind / Choice | 日 | 全部 |
-| `pb_percentile` | PB 历史百分位 | Wind / Choice | 日 | 全部 |
 | `debt_ratio_deterioration` | 资产负债率环比 | Wind / Choice | 季度 | 传统 |
 | `goodwill_ratio` | 商誉 / 净资产 | Wind / Choice | 季度 | 传统 |
 | `operating_cashflow_ratio` | 经营现金流 / 净利润 | Wind / Choice | 季度 | 传统 |
@@ -485,7 +485,7 @@ tests/
 |------|------|------|
 | Step 1a | PolicyFactorPlugin + YAML | 国策乘数可独立运行 |
 | Step 1b | MoatFactorPlugin 静态分 | 读取 YAML，输出 Base Score |
-| Step 1c | DuckDB 数据层 + Fetchers | Trend/Safety 指标自动入库 |
+| Step 1c | DuckDB 数据层 + Fetchers | Trend/Safety 指标自动入库（初期允许 Mock Fetcher 注入假数据，确保流水线闭环不阻塞） |
 | Step 1d | MoatFactorPlugin 完整版 | 三段式聚合 |
 | Step 1e | Orchestrator 集成 + 置信度 | 动态权重 + 报告水印 |
 | Step 1f | 全链路集成测试 | 端到端验证 |
