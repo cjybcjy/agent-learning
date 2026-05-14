@@ -141,3 +141,48 @@ companies:
     assert score.details["trend_score"] == 0.0
     assert score.details["safety_score"] == 0.0
     assert score.confidence == 0.5  # lowered because dynamic data missing
+
+
+def test_moat_plugin_partial_aggregator_data(settings):
+    """Aggregator exists but returns no trend data (only safety data available)."""
+    moat_yaml = settings.config_dir / "moat_static_base.yaml"
+    moat_yaml.write_text("""
+version: "1.0"
+scoring_weights:
+  base: { weight: 0.4 }
+  trend: { weight: 0.35 }
+  safety: { weight: 0.25 }
+companies:
+  "600519":
+    base_score:
+      brand_premium: { score: 80 }
+      franchise_barrier: { score: 80 }
+      switching_cost: { score: 80 }
+      network_effect: { score: 80 }
+      cost_advantage: { score: 80 }
+""", encoding="utf-8")
+
+    db = Database(settings.database_path)
+    agg = MetricsAggregator(db, mock_mode=False)
+    agg.bootstrap()
+
+    target = TargetInfo(
+        symbol="600519", market=Market.A_SHARE, asset_class="equity"
+    )
+
+    # Insert only safety metrics, no trend metrics
+    agg.insert_safety_metric(
+        target, "debt_ratio_deterioration", 70.0, "2024-01-01"
+    )
+
+    plugin = MoatFactorPlugin(config_path=moat_yaml, aggregator=agg)
+    score = plugin.evaluate(target)
+
+    # base=80, trend=0, safety=70
+    # score = 80*0.4 + 0*0.35 + 70*0.25 = 32 + 0 + 17.5 = 49.5
+    assert score.score == 49.5
+    assert score.details["base_score"] == 80.0
+    assert score.details["trend_score"] == 0.0
+    assert score.details["safety_score"] == 70.0
+    # Confidence should not be 0.0; with base + safety available, it's min(0.9, 0.8) = 0.8
+    assert score.confidence == 0.8

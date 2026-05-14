@@ -13,6 +13,13 @@ class MoatFactorPlugin(BaseFactorPlugin):
     factor_name = "护城河深度"
     default_weight = 0.5
 
+    DEFAULT_BASE_WEIGHT = 0.4
+    DEFAULT_TREND_WEIGHT = 0.35
+    DEFAULT_SAFETY_WEIGHT = 0.25
+    BASE_CONFIDENCE = 0.9
+    DYNAMIC_CONFIDENCE = 0.8
+    FALLBACK_CONFIDENCE = 0.5
+
     def __init__(
         self,
         config_path: Path | None = None,
@@ -28,9 +35,9 @@ class MoatFactorPlugin(BaseFactorPlugin):
         if self.config_path is None or not self.config_path.exists():
             return {
                 "scoring_weights": {
-                    "base": {"weight": 0.4},
-                    "trend": {"weight": 0.35},
-                    "safety": {"weight": 0.25},
+                    "base": {"weight": self.DEFAULT_BASE_WEIGHT},
+                    "trend": {"weight": self.DEFAULT_TREND_WEIGHT},
+                    "safety": {"weight": self.DEFAULT_SAFETY_WEIGHT},
                 },
                 "companies": {},
             }
@@ -53,13 +60,13 @@ class MoatFactorPlugin(BaseFactorPlugin):
                 weight=self.default_weight,
                 details={
                     "base_score": 0.0,
-                    "base_weight": weights.get("base", {}).get("weight", 0.4),
+                    "base_weight": weights.get("base", {}).get("weight", self.DEFAULT_BASE_WEIGHT),
                     "trend_score": 0.0,
-                    "trend_weight": weights.get("trend", {}).get("weight", 0.35),
+                    "trend_weight": weights.get("trend", {}).get("weight", self.DEFAULT_TREND_WEIGHT),
                     "safety_score": 0.0,
-                    "safety_weight": weights.get("safety", {}).get("weight", 0.25),
+                    "safety_weight": weights.get("safety", {}).get("weight", self.DEFAULT_SAFETY_WEIGHT),
                 },
-                confidence=0.5,
+                confidence=self.FALLBACK_CONFIDENCE,
                 warnings=[f"未找到 {target.symbol} 的静态评分记录"],
             )
 
@@ -78,17 +85,29 @@ class MoatFactorPlugin(BaseFactorPlugin):
         safety_score, safety_confidence = self._compute_safety_score(target)
 
         # 4. Weighted aggregation
-        base_w = weights.get("base", {}).get("weight", 0.4)
-        trend_w = weights.get("trend", {}).get("weight", 0.35)
-        safety_w = weights.get("safety", {}).get("weight", 0.25)
+        base_w = weights.get("base", {}).get("weight", self.DEFAULT_BASE_WEIGHT)
+        trend_w = weights.get("trend", {}).get("weight", self.DEFAULT_TREND_WEIGHT)
+        safety_w = weights.get("safety", {}).get("weight", self.DEFAULT_SAFETY_WEIGHT)
 
         final_score = base_score * base_w + trend_score * trend_w + safety_score * safety_w
 
-        # Confidence is minimum of available segments
+        # Confidence calculation:
+        # - If aggregator is None: fallback confidence
+        # - If aggregator exists but no dynamic data at all: fallback confidence
+        # - If base + some dynamic segments have data: min of available segment confidences
         if self.aggregator is not None:
-            overall_confidence = min([0.9, trend_confidence, safety_confidence])
+            segment_confidences = [self.BASE_CONFIDENCE]
+            if trend_confidence > 0.0:
+                segment_confidences.append(trend_confidence)
+            if safety_confidence > 0.0:
+                segment_confidences.append(safety_confidence)
+            if len(segment_confidences) == 1:
+                # Only base data available
+                overall_confidence = self.FALLBACK_CONFIDENCE
+            else:
+                overall_confidence = min(segment_confidences)
         else:
-            overall_confidence = 0.5  # lowered because dynamic data missing
+            overall_confidence = self.FALLBACK_CONFIDENCE
         warnings: list[str] = []
         if self.aggregator is None:
             warnings.append("动态指标数据缺失，仅使用静态评分")
@@ -111,28 +130,36 @@ class MoatFactorPlugin(BaseFactorPlugin):
             warnings=warnings,
         )
 
-    def _compute_trend_score(self, target: TargetInfo) -> tuple[float, float]:
+    def _compute_segment_score(
+        self,
+        target: TargetInfo,
+        metrics: list[str],
+        fetch_fn: callable,
+    ) -> tuple[float, float]:
+        """Compute average score and confidence for a segment of metrics."""
         if self.aggregator is None:
             return 0.0, 0.0
-        metrics = ["roic_sustainability", "gmoat_stability", "rd_efficiency"]
         values: list[float] = []
         for metric in metrics:
-            row = self.aggregator.get_latest_trend_metric(target, metric)
+            row = fetch_fn(target, metric)
             if row is not None:
                 values.append(float(row["value"]))
         if not values:
             return 0.0, 0.0
-        return sum(values) / len(values), 0.8
+        return sum(values) / len(values), self.DYNAMIC_CONFIDENCE
+
+    def _compute_trend_score(self, target: TargetInfo) -> tuple[float, float]:
+        if self.aggregator is None:
+            return 0.0, 0.0
+        metrics = ["roic_sustainability", "gmoat_stability", "rd_efficiency"]
+        return self._compute_segment_score(
+            target, metrics, self.aggregator.get_latest_trend_metric
+        )
 
     def _compute_safety_score(self, target: TargetInfo) -> tuple[float, float]:
         if self.aggregator is None:
             return 0.0, 0.0
         metrics = ["debt_ratio_deterioration", "goodwill_ratio", "operating_cashflow_ratio"]
-        values: list[float] = []
-        for metric in metrics:
-            row = self.aggregator.get_latest_safety_metric(target, metric)
-            if row is not None:
-                values.append(float(row["value"]))
-        if not values:
-            return 0.0, 0.0
-        return sum(values) / len(values), 0.8
+        return self._compute_segment_score(
+            target, metrics, self.aggregator.get_latest_safety_metric
+        )
