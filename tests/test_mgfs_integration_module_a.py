@@ -91,3 +91,9 @@ sectors:
     assert "护城河深度" in result.stdout
     assert "国策环境" in result.stdout
     assert "综合置信度" in result.stdout
+    # Stronger assertions on computed values
+    assert "原始加权分: 41.12" in result.stdout
+    assert "政策乘数: 1.0" in result.stdout
+    assert "最终得分: 41.12" in result.stdout
+    assert "评级: Avoid" in result.stdout
+    assert "建议动作: 回避" in result.stdout
