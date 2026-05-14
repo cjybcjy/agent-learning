@@ -29,25 +29,28 @@ class PolicyFactorPlugin(BaseFactorPlugin):
         cfg = self._load_config()
         default = float(cfg.get("default_multiplier", 1.0))
 
+        # 1. Symbol override
         override = cfg.get("overrides", {}).get(target.symbol, {})
         multiplier = override.get("multiplier")
         note = override.get("note", "")
 
+        # 2. Sector lookup
         if multiplier is None and target.sector:
             sector_cfg = cfg.get("sectors", {}).get(target.sector, {})
             multiplier = sector_cfg.get("multiplier")
             note = sector_cfg.get("note", "")
 
+        # 3. Default fallback
         if multiplier is None:
             multiplier = default
-            note = note or ""
+            note = ""
 
         return FactorScore(
             factor_key=self.factor_key,
             factor_name=self.factor_name,
             score=round(multiplier * 100, 2),
             max_score=100.0,
-            weight=0.0,
+            weight=self.default_weight,
             details={
                 "multiplier": multiplier,
                 "policy_rating": self._rating_from_multiplier(multiplier),
