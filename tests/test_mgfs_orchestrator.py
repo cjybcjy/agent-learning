@@ -275,3 +275,52 @@ def test_all_plugins_crash_returns_error_rating():
     assert decision.final_score == 0.0
     assert decision.factor_scores["moat"].confidence == 0.0
     assert decision.factor_scores["token_metrics"].confidence == 0.0
+
+
+class CryptoOnlyPlugin(BaseFactorPlugin):
+    factor_key = "crypto_only"
+    factor_name = "Crypto专用"
+
+    def is_applicable(self, target: TargetInfo) -> bool:
+        return target.asset_class == "crypto"
+
+    def evaluate(self, target: TargetInfo) -> FactorScore:
+        return FactorScore(
+            factor_key=self.factor_key,
+            factor_name=self.factor_name,
+            score=80.0,
+        )
+
+
+def test_orchestrator_skips_non_applicable_plugins():
+    orchestrator = MGFSOrchestrator(
+        plugins=[CryptoOnlyPlugin()],
+        scoring_weights={"crypto_only": 0.3},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {"min_score": 0.0, "label": "Avoid", "action": "回避"},
+        ],
+    )
+    target = TargetInfo(symbol="600519", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target)
+
+    assert "crypto_only" not in decision.factor_scores
+    assert decision.raw_total == 0.0
+
+
+def test_orchestrator_includes_applicable_plugins():
+    orchestrator = MGFSOrchestrator(
+        plugins=[CryptoOnlyPlugin()],
+        scoring_weights={"crypto_only": 0.3},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {"min_score": 0.0, "label": "Avoid", "action": "回避"},
+        ],
+    )
+    target = TargetInfo(symbol="BTC", market=Market.CRYPTO, asset_class="crypto")
+    decision = orchestrator.evaluate(target)
+
+    assert "crypto_only" in decision.factor_scores
+    assert decision.factor_scores["crypto_only"].score == 80.0

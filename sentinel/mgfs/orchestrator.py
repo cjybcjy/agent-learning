@@ -100,16 +100,18 @@ class MGFSOrchestrator:
     def _run_plugins(self, target: TargetInfo) -> dict[str, FactorScore]:
         scores: dict[str, FactorScore] = {}
         for key, plugin in self.plugins.items():
+            if not plugin.is_applicable(target):
+                continue
             try:
                 scores[key] = plugin.evaluate(target)
-            except Exception:
+            except Exception as e:
                 logger.exception("Factor %s failed for %s", key, target.symbol)
                 scores[key] = FactorScore(
                     factor_key=key,
                     factor_name=plugin.factor_name,
                     score=0.0,
                     confidence=0.0,
-                    warnings=[f"{plugin.factor_name} 评估失败，使用兜底分数"],
+                    warnings=[f"【系统故障】{plugin.factor_name} 评估失败: {str(e)}"],
                 )
         return scores
 

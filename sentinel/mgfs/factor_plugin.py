@@ -58,5 +58,14 @@ class BaseFactorPlugin(ABC):
     def evaluate(self, target: TargetInfo) -> FactorScore:
         raise NotImplementedError
 
+    def is_applicable(self, target: TargetInfo) -> bool:
+        """Return True if this plugin should evaluate the given target.
+
+        Subclasses may override to declare asset-class or market-specific
+        applicability. Non-applicable plugins are skipped entirely by the
+        orchestrator (no weight assigned, no fallback score generated).
+        """
+        return True
+
     def health_check(self) -> dict[str, Any]:
         return {"ready": True, "missing_dependencies": []}
