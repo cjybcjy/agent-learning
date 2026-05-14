@@ -1,0 +1,28 @@
+version: "1.0"
+last_updated: "2026-05-14"
+
+scoring_weights:
+  base: { weight: 0.4 }
+  trend: { weight: 0.35 }
+  safety: { weight: 0.25 }
+
+companies:
+  "600519":
+    name: "贵州茅台"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 95, note: "社交货币属性，议价能力极强" }
+      franchise_barrier: { score: 90, note: "地理标志保护 + 产能壁垒" }
+      switching_cost: { score: 88, note: "用户口味依赖，转换成本极高" }
+      network_effect: { score: 60, note: "无显著网络效应" }
+      cost_advantage: { score: 70, note: "毛利率高但原料成本有波动" }
+
+  "000001":
+    name: "平安银行"
+    sector: "银行"
+    base_score:
+      brand_premium: { score: 60, note: "品牌认知度中等" }
+      franchise_barrier: { score: 75, note: "金融牌照壁垒" }
+      switching_cost: { score: 55, note: "账户迁移成本一般" }
+      network_effect: { score: 55, note: "网点规模效应，但无网络效应" }
+      cost_advantage: { score: 65, note: "资金成本优势一般" }
