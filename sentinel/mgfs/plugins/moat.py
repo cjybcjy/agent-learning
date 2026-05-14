@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -134,7 +136,7 @@ class MoatFactorPlugin(BaseFactorPlugin):
         self,
         target: TargetInfo,
         metrics: list[str],
-        fetch_fn: callable,
+        fetch_fn: Callable[[TargetInfo, str], dict[str, Any] | None],
     ) -> tuple[float, float]:
         """Compute average score and confidence for a segment of metrics."""
         if self.aggregator is None:
