@@ -1,0 +1,31 @@
+version: "1.0"
+last_updated: "2026-05-14"
+
+default_multiplier: 1.0
+
+sectors:
+  "白酒":
+    policy_rating: "neutral"
+    multiplier: 1.0
+    note: "消费品，非政策敏感"
+  "新能源汽车":
+    policy_rating: "core_support"
+    multiplier: 1.2
+    note: "十五五核心赛道"
+  "在线教育":
+    policy_rating: "restricted"
+    multiplier: 0.5
+    note: "双减政策后行业整顿"
+  "房地产":
+    policy_rating: "restricted"
+    multiplier: 0.6
+    note: "房住不炒基调未变"
+  "煤炭":
+    policy_rating: "transition"
+    multiplier: 0.8
+    note: "能源安全保供 + 双碳转型压力"
+
+overrides:
+  "600519":
+    multiplier: 1.1
+    note: "消费品龙头，政策风险极低"
