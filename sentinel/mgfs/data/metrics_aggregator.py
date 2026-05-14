@@ -93,3 +93,57 @@ class MetricsAggregator:
             return dict(zip(columns, row))
         finally:
             con.close()
+
+    def insert_safety_metric(
+        self,
+        target: TargetInfo,
+        metric_name: str,
+        value: float,
+        recorded_at: datetime | None = None,
+    ) -> None:
+        if recorded_at is None:
+            recorded_at = datetime.now(tz=timezone.utc)
+        con = self.database.connect()
+        try:
+            con.execute(
+                """
+                INSERT INTO safety_metrics
+                (symbol, market, metric_name, value, recorded_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (symbol, market, metric_name, recorded_at)
+                DO UPDATE SET value = EXCLUDED.value
+                """,
+                [target.symbol, target.market.value, metric_name, value, recorded_at],
+            )
+        finally:
+            con.close()
+
+    def get_latest_safety_metric(
+        self, target: TargetInfo, metric_name: str
+    ) -> dict[str, Any] | None:
+        if self.mock_mode:
+            return {
+                "symbol": target.symbol,
+                "market": target.market.value,
+                "metric_name": metric_name,
+                "value": round(random.uniform(30.0, 90.0), 2),
+                "recorded_at": datetime.now(tz=timezone.utc),
+            }
+
+        con = self.database.connect()
+        try:
+            row = con.execute(
+                """
+                SELECT * FROM safety_metrics
+                WHERE symbol = ? AND market = ? AND metric_name = ?
+                ORDER BY recorded_at DESC
+                LIMIT 1
+                """,
+                [target.symbol, target.market.value, metric_name],
+            ).fetchone()
+            if row is None:
+                return None
+            columns = [desc[0] for desc in con.description]
+            return dict(zip(columns, row))
+        finally:
+            con.close()
