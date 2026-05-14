@@ -39,6 +39,7 @@ companies:
     assert score.factor_name == "护城河深度"
     assert score.details["base_score"] == 80.6
     assert score.details["base_weight"] == 0.4
+    assert score.score == 32.24
 
 
 def test_moat_plugin_missing_company_returns_zero_with_warning(settings):
@@ -58,4 +59,10 @@ companies: {}
 
     assert score.score == 0.0
     assert score.confidence == 0.5
+    assert score.details["base_score"] == 0.0
+    assert score.details["base_weight"] == 0.4
+    assert score.details["trend_score"] == 0.0
+    assert score.details["trend_weight"] == 0.35
+    assert score.details["safety_score"] == 0.0
+    assert score.details["safety_weight"] == 0.25
     assert any("未找到" in w and "静态评分" in w for w in score.warnings)
