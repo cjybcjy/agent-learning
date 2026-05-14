@@ -59,7 +59,7 @@ def evaluate(
     except FileNotFoundError:
         typer.echo("错误: 未找到 mgfs_config.yaml，请检查配置目录", err=True)
         raise typer.Exit(1)
-    orchestrator = build_orchestrator(config)
+    orchestrator = build_orchestrator(config, config_dir=settings.resolved_config_dir)
 
     target = TargetInfo(
         symbol=symbol,
@@ -91,7 +91,8 @@ def evaluate(
     if decision.circuit_breakers_triggered:
         typer.echo("触发熔断:")
         for cb in decision.circuit_breakers_triggered:
-            typer.echo(f"  - [{cb['action']}] {cb['message']}")
+            action_label = cb.get("action") or cb.get("alert_level", "unknown")
+            typer.echo(f"  - [{action_label}] {cb['message']}")
     typer.echo(f"{'='*50}\n")
 
     if publish:

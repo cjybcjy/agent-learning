@@ -31,13 +31,14 @@ def load_mgfs_config(path: Path) -> dict:
         return yaml.safe_load(handle) or {}
 
 
-def build_orchestrator(config: dict) -> MGFSOrchestrator:
+def build_orchestrator(config: dict, config_dir: Path | None = None) -> MGFSOrchestrator:
     """Build an MGFSOrchestrator instance from a parsed configuration dict.
 
     Args:
         config: Dictionary loaded by load_mgfs_config containing modules,
             scoring_formula, policy_multiplier, circuit_breakers, and
             rating_thresholds.
+        config_dir: Optional directory containing plugin-specific config files.
 
     Returns:
         An initialized MGFSOrchestrator with loaded plugins and settings.
@@ -55,7 +56,7 @@ def build_orchestrator(config: dict) -> MGFSOrchestrator:
         if not module_config.get("enabled", False):
             continue
         try:
-            plugin = _load_plugin(module_config["class_path"])
+            plugin = _load_plugin(module_config["class_path"], config_dir, key)
             plugins.append(plugin)
         except Exception:
             logger.exception("Failed to load plugin %s", key)
@@ -73,13 +74,27 @@ def build_orchestrator(config: dict) -> MGFSOrchestrator:
     )
 
 
-def _load_plugin(class_path: str) -> BaseFactorPlugin:
+def _load_plugin(class_path: str, config_dir: Path | None = None, key: str = "") -> BaseFactorPlugin:
     module_name, class_name = class_path.rsplit(".", 1)
     module = importlib.import_module(module_name)
     cls = getattr(module, class_name)
     if not inspect.isclass(cls) or not issubclass(cls, BaseFactorPlugin):
         raise TypeError(f"{class_path} is not a BaseFactorPlugin subclass")
-    return cls()
+    sig = inspect.signature(cls.__init__)
+    kwargs: dict[str, object] = {}
+    if config_dir is not None and "config_path" in sig.parameters:
+        config_file = _plugin_config_file(key)
+        if config_file:
+            kwargs["config_path"] = config_dir / config_file
+    return cls(**kwargs)
+
+
+def _plugin_config_file(key: str) -> str | None:
+    mapping = {
+        "moat": "moat_static_base.yaml",
+        "policy": "policy_whitelist.yaml",
+    }
+    return mapping.get(key)
 
 
 def _extract_policy_multipliers(raw: dict) -> dict[str, float]:
