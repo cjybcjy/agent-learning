@@ -84,6 +84,9 @@ def evaluate(
     typer.echo(f"最终得分: {decision.final_score}")
     typer.echo(f"评级: {decision.rating}")
     typer.echo(f"建议动作: {decision.action}")
+    if decision.report_sections.get("watermark"):
+        typer.echo(f"⚠️  {decision.report_sections['watermark']}")
+    typer.echo(f"综合置信度: {decision.report_sections.get('overall_confidence', 'N/A')}")
     typer.echo(f"告警级别: {decision.alert_level.value}")
     if decision.circuit_breakers_triggered:
         typer.echo("触发熔断:")

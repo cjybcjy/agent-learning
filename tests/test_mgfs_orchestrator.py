@@ -324,3 +324,59 @@ def test_orchestrator_includes_applicable_plugins():
 
     assert "crypto_only" in decision.factor_scores
     assert decision.factor_scores["crypto_only"].score == 80.0
+
+
+def test_orchestrator_computes_overall_confidence():
+    class HighConfPlugin(BaseFactorPlugin):
+        factor_key = "high"
+        factor_name = "高置信度"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(factor_key="high", factor_name="高置信度", score=80.0, confidence=1.0)
+
+    class LowConfPlugin(BaseFactorPlugin):
+        factor_key = "low"
+        factor_name = "低置信度"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(factor_key="low", factor_name="低置信度", score=60.0, confidence=0.5)
+
+    orchestrator = MGFSOrchestrator(
+        plugins=[HighConfPlugin(), LowConfPlugin()],
+        scoring_weights={"high": 0.5, "low": 0.5},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {"min_score": 0.0, "label": "Avoid", "action": "回避"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target)
+
+    # overall confidence = (1.0*0.5 + 0.5*0.5) / (0.5+0.5) = 0.75
+    assert decision.report_sections.get("overall_confidence") == 0.75
+    assert decision.report_sections.get("watermark") == "[数据部分缺失]"
+
+
+def test_orchestrator_low_confidence_adds_watermark():
+    class ZeroConfPlugin(BaseFactorPlugin):
+        factor_key = "zero"
+        factor_name = "零置信度"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(factor_key="zero", factor_name="零置信度", score=50.0, confidence=0.0)
+
+    orchestrator = MGFSOrchestrator(
+        plugins=[ZeroConfPlugin()],
+        scoring_weights={"zero": 1.0},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {"min_score": 0.0, "label": "Avoid", "action": "回避"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+    decision = orchestrator.evaluate(target)
+
+    assert decision.report_sections.get("overall_confidence") == 0.0
+    assert decision.report_sections.get("watermark") == "[数据残缺 / 评估挂起]"

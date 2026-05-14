@@ -74,6 +74,7 @@ class MGFSOrchestrator:
                 action="系统异常，人工复核",
                 circuit_breakers_triggered=[],
                 alert_level=AlertLevel.YELLOW_WARNING,
+                report_sections={"overall_confidence": 0.0, "watermark": "[数据残缺 / 评估挂起]"},
             )
 
         raw_total = self._compute_raw_total(factor_scores)
@@ -83,6 +84,13 @@ class MGFSOrchestrator:
             factor_scores, policy_rating
         )
         rating, action = self._classify_rating(final_score, alert_level)
+        overall_confidence = self._compute_overall_confidence(factor_scores)
+        if overall_confidence < 0.5:
+            watermark = "[数据残缺 / 评估挂起]"
+        elif overall_confidence < 0.8:
+            watermark = "[数据部分缺失]"
+        else:
+            watermark = ""
 
         return InvestmentDecision(
             target=target,
@@ -95,6 +103,7 @@ class MGFSOrchestrator:
             action=action,
             circuit_breakers_triggered=triggered,
             alert_level=alert_level,
+            report_sections={"overall_confidence": overall_confidence, "watermark": watermark},
         )
 
     def _run_plugins(self, target: TargetInfo) -> dict[str, FactorScore]:
@@ -114,6 +123,19 @@ class MGFSOrchestrator:
                     warnings=[f"【系统故障】{plugin.factor_name} 评估失败: {str(e)}"],
                 )
         return scores
+
+    def _compute_overall_confidence(
+        self, factor_scores: dict[str, FactorScore]
+    ) -> float:
+        if not factor_scores:
+            return 0.0
+        total_weight = 0.0
+        weighted_confidence = 0.0
+        for key, score in factor_scores.items():
+            w = self.scoring_weights.get(key, 0.0)
+            total_weight += w
+            weighted_confidence += score.confidence * w
+        return weighted_confidence / total_weight if total_weight > 0 else 0.0
 
     def _compute_raw_total(
         self, factor_scores: dict[str, FactorScore]
