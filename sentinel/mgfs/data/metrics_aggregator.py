@@ -78,7 +78,7 @@ class MetricsAggregator:
 
         con = self.database.connect()
         try:
-            row = con.execute(
+            result = con.execute(
                 """
                 SELECT * FROM trend_metrics
                 WHERE symbol = ? AND market = ? AND metric_name = ?
@@ -86,10 +86,11 @@ class MetricsAggregator:
                 LIMIT 1
                 """,
                 [target.symbol, target.market.value, metric_name],
-            ).fetchone()
+            )
+            columns = [desc[0] for desc in result.description]
+            row = result.fetchone()
             if row is None:
                 return None
-            columns = [desc[0] for desc in con.description]
             return dict(zip(columns, row))
         finally:
             con.close()
@@ -132,7 +133,7 @@ class MetricsAggregator:
 
         con = self.database.connect()
         try:
-            row = con.execute(
+            result = con.execute(
                 """
                 SELECT * FROM safety_metrics
                 WHERE symbol = ? AND market = ? AND metric_name = ?
@@ -140,10 +141,11 @@ class MetricsAggregator:
                 LIMIT 1
                 """,
                 [target.symbol, target.market.value, metric_name],
-            ).fetchone()
+            )
+            columns = [desc[0] for desc in result.description]
+            row = result.fetchone()
             if row is None:
                 return None
-            columns = [desc[0] for desc in con.description]
             return dict(zip(columns, row))
         finally:
             con.close()

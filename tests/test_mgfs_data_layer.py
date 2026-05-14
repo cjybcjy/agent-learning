@@ -36,6 +36,9 @@ def test_aggregator_insert_and_query_trend(settings):
 
     result = agg.get_latest_trend_metric(target, "roic_sustainability")
     assert result is not None
+    assert result["symbol"] == "600519"
+    assert result["market"] == "A股"
+    assert result["metric_name"] == "roic_sustainability"
     assert result["value"] == 85.0
 
 
@@ -64,4 +67,7 @@ def test_aggregator_insert_and_query_safety(settings):
 
     result = agg.get_latest_safety_metric(target, "debt_ratio")
     assert result is not None
+    assert result["symbol"] == "600519"
+    assert result["market"] == "A股"
+    assert result["metric_name"] == "debt_ratio"
     assert result["value"] == 45.0
