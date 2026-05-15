@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-05-15T14:38:24.759573",
+  "total_stocks": 15,
+  "successful_evaluations": 15,
+  "rating_distribution": {
+    "Avoid": 15
+  },
+  "alert_distribution": {
+    "soft_veto": 15
+  }
+}
