@@ -51,7 +51,11 @@ class ArchetypeRouter:
         override = overrides.get(symbol)
         if override is not None:
             effective_until = override.get("effective_until")
-            if effective_until is not None:
+            if effective_until is None:
+                # No expiry = permanent override
+                archetype_name = override["archetype"]
+                return archetypes.get(archetype_name, archetypes.get(default_name, {}))
+            else:
                 try:
                     expiry = datetime.strptime(effective_until, "%Y-%m-%d")
                     if datetime.now() <= expiry:
