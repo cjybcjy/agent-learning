@@ -16,6 +16,8 @@ class TargetInfo:
     asset_class: str
     name: str | None = None
     sector: str | None = None
+    theme: str | None = None
+    ecosystem_role: str | None = None
     tags: list[str] = field(default_factory=list)
 
 
