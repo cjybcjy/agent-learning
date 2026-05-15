@@ -74,3 +74,12 @@ def test_load_plugin_rejects_non_subclass():
     with pytest.raises(TypeError):
         from sentinel.mgfs.config_loader import _load_plugin
         _load_plugin("sentinel.domain.models.Market")
+
+
+def test_plugin_config_file_includes_valuation():
+    from sentinel.mgfs.config_loader import _plugin_config_file
+
+    assert _plugin_config_file("valuation") == "valuation_sector_routing.yaml"
+    assert _plugin_config_file("moat") == "moat_static_base.yaml"
+    assert _plugin_config_file("policy") == "policy_whitelist.yaml"
+    assert _plugin_config_file("unknown") is None

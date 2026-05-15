@@ -93,6 +93,7 @@ def _plugin_config_file(key: str) -> str | None:
     mapping = {
         "moat": "moat_static_base.yaml",
         "policy": "policy_whitelist.yaml",
+        "valuation": "valuation_sector_routing.yaml",
     }
     return mapping.get(key)
 
