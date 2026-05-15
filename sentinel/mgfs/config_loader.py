@@ -31,7 +31,11 @@ def load_mgfs_config(path: Path) -> dict:
         return yaml.safe_load(handle) or {}
 
 
-def build_orchestrator(config: dict, config_dir: Path | None = None) -> MGFSOrchestrator:
+def build_orchestrator(
+    config: dict,
+    config_dir: Path | None = None,
+    fetchers: dict[str, Any] | None = None,
+) -> MGFSOrchestrator:
     """Build an MGFSOrchestrator instance from a parsed configuration dict.
 
     Args:
@@ -39,6 +43,8 @@ def build_orchestrator(config: dict, config_dir: Path | None = None) -> MGFSOrch
             scoring_formula, policy_multiplier, circuit_breakers, and
             rating_thresholds.
         config_dir: Optional directory containing plugin-specific config files.
+        fetchers: Optional dict mapping plugin key to a pre-built fetcher
+            instance (e.g. {"valuation": EastmoneyValuationFetcher()}).
 
     Returns:
         An initialized MGFSOrchestrator with loaded plugins and settings.
@@ -56,7 +62,9 @@ def build_orchestrator(config: dict, config_dir: Path | None = None) -> MGFSOrch
         if not module_config.get("enabled", False):
             continue
         try:
-            plugin = _load_plugin(module_config["class_path"], config_dir, key)
+            plugin = _load_plugin(
+                module_config["class_path"], config_dir, key, fetchers
+            )
             plugins.append(plugin)
         except Exception:
             logger.exception("Failed to load plugin %s", key)
@@ -74,7 +82,12 @@ def build_orchestrator(config: dict, config_dir: Path | None = None) -> MGFSOrch
     )
 
 
-def _load_plugin(class_path: str, config_dir: Path | None = None, key: str = "") -> BaseFactorPlugin:
+def _load_plugin(
+    class_path: str,
+    config_dir: Path | None = None,
+    key: str = "",
+    fetchers: dict[str, Any] | None = None,
+) -> BaseFactorPlugin:
     module_name, class_name = class_path.rsplit(".", 1)
     module = importlib.import_module(module_name)
     cls = getattr(module, class_name)
@@ -86,6 +99,8 @@ def _load_plugin(class_path: str, config_dir: Path | None = None, key: str = "")
         config_file = _plugin_config_file(key)
         if config_file:
             kwargs["config_path"] = config_dir / config_file
+    if fetchers and "fetcher" in sig.parameters and key in fetchers:
+        kwargs["fetcher"] = fetchers[key]
     return cls(**kwargs)
 
 

@@ -237,7 +237,12 @@ def main() -> int:
         return 1
 
     config = load_mgfs_config(config_path)
-    orchestrator = build_orchestrator(config, config_dir=settings.resolved_config_dir)
+    from sentinel.mgfs.data.eastmoney_fetcher import EastmoneyValuationFetcher
+
+    fetchers = {"valuation": EastmoneyValuationFetcher()}
+    orchestrator = build_orchestrator(
+        config, config_dir=settings.resolved_config_dir, fetchers=fetchers
+    )
     logger.info("Orchestrator loaded with plugins: %s", list(orchestrator.plugins.keys()))
 
     # Load stock universe

@@ -51,6 +51,7 @@ def evaluate(
 ) -> None:
     from sentinel.mgfs.config_loader import load_mgfs_config, build_orchestrator
     from sentinel.mgfs.factor_plugin import TargetInfo
+    from sentinel.mgfs.data.eastmoney_fetcher import EastmoneyValuationFetcher
 
     settings = AppSettings()
     config_path = settings.resolved_config_dir / "mgfs_config.yaml"
@@ -59,7 +60,11 @@ def evaluate(
     except FileNotFoundError:
         typer.echo("错误: 未找到 mgfs_config.yaml，请检查配置目录", err=True)
         raise typer.Exit(1)
-    orchestrator = build_orchestrator(config, config_dir=settings.resolved_config_dir)
+
+    fetchers = {"valuation": EastmoneyValuationFetcher()}
+    orchestrator = build_orchestrator(
+        config, config_dir=settings.resolved_config_dir, fetchers=fetchers
+    )
 
     target = TargetInfo(
         symbol=symbol,
@@ -86,7 +91,8 @@ def evaluate(
     typer.echo(f"建议动作: {decision.action}")
     if decision.report_sections.get("watermark"):
         typer.echo(f"⚠️  {decision.report_sections['watermark']}")
-    typer.echo(f"综合置信度: {decision.report_sections.get('overall_confidence', 'N/A')}")
+    oc = decision.report_sections.get('overall_confidence')
+    typer.echo(f"综合置信度: {oc:.0%}" if oc is not None else "综合置信度: N/A")
     typer.echo(f"告警级别: {decision.alert_level.value}")
     if decision.circuit_breakers_triggered:
         typer.echo("触发熔断:")
