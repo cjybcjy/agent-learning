@@ -1,5 +1,5 @@
 version: "1.0"
-last_updated: "2026-05-14"
+last_updated: "2026-05-15"
 
 default_multiplier: 1.0
 
@@ -8,18 +8,54 @@ sectors:
     policy_rating: "neutral"
     multiplier: 1.0
     note: "消费品，非政策敏感"
+  "食品饮料":
+    policy_rating: "neutral"
+    multiplier: 1.0
+    note: "必选消费，政策中性"
+  "医药生物":
+    policy_rating: "favorable"
+    multiplier: 1.1
+    note: "医疗健康为民生基础，集采常态化但创新药鼓励"
+  "医疗器械":
+    policy_rating: "favorable"
+    multiplier: 1.1
+    note: "国产替代加速，高端医疗设备受政策扶持"
+  "家用电器":
+    policy_rating: "neutral"
+    multiplier: 1.0
+    note: "以旧换新补贴阶段性利好，长期政策中性"
+  "电子":
+    policy_rating: "core_support"
+    multiplier: 1.2
+    note: "消费电子与精密制造为出口支柱，供应链安全受重视"
+  "半导体":
+    policy_rating: "core_support"
+    multiplier: 1.2
+    note: "解决卡脖子技术，大基金三期持续注资"
   "新能源汽车":
     policy_rating: "core_support"
     multiplier: 1.2
     note: "十五五核心赛道"
-  "在线教育":
-    policy_rating: "restricted"
-    multiplier: 0.5
-    note: "双减政策后行业整顿"
-  "房地产":
-    policy_rating: "restricted"
-    multiplier: 0.6
-    note: "房住不炒基调未变"
+  "人工智能":
+    policy_rating: "core_support"
+    multiplier: 1.2
+    note: "算力与AI基础设施适度超前建设"
+  "云计算":
+    policy_rating: "encouraged"
+    multiplier: 1.1
+    note: "数字经济底座，政策友好"
+  "软件服务":
+    policy_rating: "encouraged"
+    multiplier: 1.1
+    note: "数字化转型推动，信创替代加速"
+  "银行":
+    policy_rating: "neutral"
+    multiplier: 1.0
+    note: "金融稳定为底线，息差承压但系统性风险可控"
+  "保险":
+    policy_rating: "neutral"
+    multiplier: 1.0
+    note: "政策中性，长期受益于养老金融"
   "煤炭":
     policy_rating: "transition"
     multiplier: 0.8
@@ -28,6 +64,26 @@ sectors:
     policy_rating: "neutral"
     multiplier: 1.0
     note: "周期行业，政策中性"
+  "钢铁":
+    policy_rating: "transition"
+    multiplier: 0.8
+    note: "产能过剩 + 双碳压力"
+  "化工":
+    policy_rating: "transition"
+    multiplier: 0.9
+    note: "高耗能行业受双碳约束，但新材料细分受鼓励"
+  "房地产":
+    policy_rating: "restricted"
+    multiplier: 0.6
+    note: "房住不炒基调未变"
+  "在线教育":
+    policy_rating: "restricted"
+    multiplier: 0.5
+    note: "双减政策后行业整顿"
+  "高污染重工业":
+    policy_rating: "restricted"
+    multiplier: 0.5
+    note: "双碳目标下的清退对象"
 
 overrides:
   "600519":

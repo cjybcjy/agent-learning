@@ -1,5 +1,5 @@
 version: "1.0"
-last_updated: "2026-05-14"
+last_updated: "2026-05-15"
 
 scoring_weights:
   base: { weight: 0.4 }
@@ -26,6 +26,106 @@ companies:
       switching_cost: { score: 55, note: "账户迁移成本一般" }
       network_effect: { score: 55, note: "网点规模效应，但无网络效应" }
       cost_advantage: { score: 65, note: "资金成本优势一般" }
+
+  "000858":
+    name: "五粮液"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 88, note: "浓香型白酒龙头，千年酿造历史，品牌溢价仅次于茅台" }
+      franchise_barrier: { score: 82, note: "明清老窖池资源稀缺，宜宾核心产区不可复制" }
+      switching_cost: { score: 80, note: "高端商务宴请场景强绑定，消费者口味依赖度高" }
+      network_effect: { score: 55, note: "无显著网络效应" }
+      cost_advantage: { score: 70, note: "规模效应显著，但粮食原料成本存在波动" }
+
+  "000568":
+    name: "泸州老窖"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 85, note: "浓香型白酒鼻祖，国窖1573高端占位稳固" }
+      franchise_barrier: { score: 80, note: "百年老窖池群 + 非遗酿造技艺，资源壁垒深厚" }
+      switching_cost: { score: 75, note: "高端白酒消费者品牌忠诚度高，口感依赖性强" }
+      network_effect: { score: 50, note: "无显著网络效应" }
+      cost_advantage: { score: 72, note: "中高端产品结构持续优化，毛利率稳步提升" }
+
+  "000596":
+    name: "古井贡酒"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 78, note: "徽酒绝对龙头，古20系列省内品牌认知度极高" }
+      franchise_barrier: { score: 70, note: "亳州产区优势 + 明清窖池，但地域性较强" }
+      switching_cost: { score: 70, note: "安徽省内消费者习惯粘性极强，宴席场景绑定" }
+      network_effect: { score: 45, note: "无显著网络效应" }
+      cost_advantage: { score: 75, note: "省内渠道深耕数十年，运营效率领先区域同行" }
+
+  "002304":
+    name: "洋河股份"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 75, note: "梦之蓝系列全国化布局，但近年品牌力有所承压" }
+      franchise_barrier: { score: 65, note: "宿迁产区 + 万吨陶坛库，但窖池资源弱于川酒" }
+      switching_cost: { score: 65, note: "绵柔型口感差异化，但消费者转换成本一般" }
+      network_effect: { score: 45, note: "无显著网络效应" }
+      cost_advantage: { score: 78, note: "产能规模行业领先，渠道精细化运营能力强" }
+
+  "000333":
+    name: "美的集团"
+    sector: "家用电器"
+    base_score:
+      brand_premium: { score: 82, note: "家电全品类全球龙头，品牌认知度与海尔并驾齐驱" }
+      franchise_barrier: { score: 70, note: "全球制造基地 + 深度分销网络，渠道壁垒深厚" }
+      switching_cost: { score: 68, note: "智能家居生态绑定，全屋解决方案粘性逐步提升" }
+      network_effect: { score: 50, note: "智能家居IoT生态存在微弱网络效应" }
+      cost_advantage: { score: 88, note: "规模效应 + 全球供应链整合 + T+3柔性制造，成本领先" }
+
+  "000651":
+    name: "格力电器"
+    sector: "家用电器"
+    base_score:
+      brand_premium: { score: 85, note: "空调行业绝对龙头，'好空调格力造'心智占领极深" }
+      franchise_barrier: { score: 72, note: "核心零部件高度自主化，经销商体系改革中" }
+      switching_cost: { score: 65, note: "空调安装服务形成一定粘性，但弱于生态绑定" }
+      network_effect: { score: 45, note: "无显著网络效应" }
+      cost_advantage: { score: 82, note: "空调单品规模效应极致，但多元化拖累整体效率" }
+
+  "002475":
+    name: "立讯精密"
+    sector: "电子"
+    base_score:
+      brand_premium: { score: 75, note: "精密制造隐形冠军，苹果核心供应链伙伴" }
+      franchise_barrier: { score: 78, note: "精密制造工艺壁垒极高，大客户认证周期长达2-3年" }
+      switching_cost: { score: 80, note: "果链深度绑定，从零件到模组到整机一站式服务" }
+      network_effect: { score: 40, note: "无显著网络效应" }
+      cost_advantage: { score: 85, note: "垂直整合 + 极致自动化 + 良率领先，成本管控能力卓越" }
+
+  "002371":
+    name: "北方华创"
+    sector: "半导体"
+    base_score:
+      brand_premium: { score: 70, note: "国产半导体设备龙头，承载国家替代战略期望" }
+      franchise_barrier: { score: 85, note: "刻蚀/薄膜/炉管设备技术壁垒极高，国产替代稀缺标的" }
+      switching_cost: { score: 75, note: "晶圆厂设备导入验证周期极长，一旦导入切换成本高昂" }
+      network_effect: { score: 45, note: "无显著网络效应" }
+      cost_advantage: { score: 65, note: "国产性价比优势明显，但高端制程仍处追赶阶段" }
+
+  "603501":
+    name: "韦尔股份"
+    sector: "半导体"
+    base_score:
+      brand_premium: { score: 72, note: "全球CIS领域前三，收购豪威后技术积累跃升" }
+      franchise_barrier: { score: 80, note: "图像传感器专利壁垒深厚，手机/汽车双轮驱动" }
+      switching_cost: { score: 70, note: "手机模组方案高度绑定，客户认证周期6-12个月" }
+      network_effect: { score: 45, note: "无显著网络效应" }
+      cost_advantage: { score: 75, note: "Fabless轻资产模式，设计+封测整合降低成本" }
+
+  "300760":
+    name: "迈瑞医疗"
+    sector: "医疗器械"
+    base_score:
+      brand_premium: { score: 80, note: "国产医疗器械全球龙头，监护/超声/IVD三大主线" }
+      franchise_barrier: { score: 82, note: "三类医疗器械注册周期长，技术门槛与合规壁垒极高" }
+      switching_cost: { score: 85, note: "设备与医院诊疗流程深度绑定，售后培训体系形成高粘性" }
+      network_effect: { score: 50, note: "无显著网络效应" }
+      cost_advantage: { score: 78, note: "研发效率高（工程师红利），中端产品性价比全球领先" }
 
   "601899":
     name: "紫金矿业"
