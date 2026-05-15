@@ -1,0 +1,42 @@
+version: "1.0"
+last_updated: "2026-05-15"
+description: "MGFS Module B — 估值范式路由与击球区定义"
+
+archetypes:
+  traditional_growth:
+    label: "传统价值成长"
+    metrics:
+      primary:   { name: "PE_TTM", weight: 0.50 }
+      secondary: { name: "PEG", weight: 0.30 }
+      warning:   { name: "Dividend_Yield", weight: 0.20 }
+    zones:
+      strong_buy:  { percentile_max: 20, score_range: [90, 100] }
+      accumulate:  { percentile_max: 40, score_range: [75, 90]  }
+      hold:        { percentile_max: 70, score_range: [50, 75]  }
+      avoid:       { percentile_max: 100, score_range: [0, 50]  }
+    circuit_breakers:
+      hard_veto_percentile: 90
+
+  heavy_asset_cyclical:
+    label: "重资产与强周期"
+    metrics:
+      primary:   { name: "PB", weight: 0.50 }
+      secondary: { name: "ROE", weight: 0.30 }
+      warning:   { name: "Operating_CF_Yield", weight: 0.20 }
+    zones:
+      strong_buy:  { percentile_max: 15, score_range: [90, 100] }
+      accumulate:  { percentile_max: 30, score_range: [75, 90]  }
+      hold:        { percentile_max: 65, score_range: [50, 75]  }
+      avoid:       { percentile_max: 100, score_range: [0, 50]  }
+    circuit_breakers:
+      hard_veto_percentile: 85
+
+sector_to_archetype:
+  "白酒": "traditional_growth"
+  "银行": "heavy_asset_cyclical"
+  "煤炭": "heavy_asset_cyclical"
+  "有色金属": "heavy_asset_cyclical"
+
+default_archetype: "traditional_growth"
+
+override_archetypes: {}
