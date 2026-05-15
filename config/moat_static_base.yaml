@@ -10,6 +10,8 @@ companies:
   "600519":
     name: "贵州茅台"
     sector: "白酒"
+    theme: "Consumer_Staples"
+    ecosystem_role: "downstream_app"
     base_score:
       brand_premium: { score: 95, note: "社交货币属性，议价能力极强" }
       franchise_barrier: { score: 90, note: "地理标志保护 + 产能壁垒" }
@@ -20,6 +22,8 @@ companies:
   "000001":
     name: "平安银行"
     sector: "银行"
+    theme: "Financial_Services"
+    ecosystem_role: "symbiotic_infra"
     base_score:
       brand_premium: { score: 60, note: "品牌认知度中等" }
       franchise_barrier: { score: 75, note: "金融牌照壁垒" }
@@ -30,6 +34,8 @@ companies:
   "000858":
     name: "五粮液"
     sector: "白酒"
+    theme: "Consumer_Staples"
+    ecosystem_role: "downstream_app"
     base_score:
       brand_premium: { score: 88, note: "浓香型白酒龙头，千年酿造历史，品牌溢价仅次于茅台" }
       franchise_barrier: { score: 82, note: "明清老窖池资源稀缺，宜宾核心产区不可复制" }
@@ -40,6 +46,8 @@ companies:
   "000568":
     name: "泸州老窖"
     sector: "白酒"
+    theme: "Consumer_Staples"
+    ecosystem_role: "downstream_app"
     base_score:
       brand_premium: { score: 85, note: "浓香型白酒鼻祖，国窖1573高端占位稳固" }
       franchise_barrier: { score: 80, note: "百年老窖池群 + 非遗酿造技艺，资源壁垒深厚" }
@@ -50,6 +58,8 @@ companies:
   "000596":
     name: "古井贡酒"
     sector: "白酒"
+    theme: "Consumer_Staples"
+    ecosystem_role: "downstream_app"
     base_score:
       brand_premium: { score: 78, note: "徽酒绝对龙头，古20系列省内品牌认知度极高" }
       franchise_barrier: { score: 70, note: "亳州产区优势 + 明清窖池，但地域性较强" }
@@ -60,6 +70,8 @@ companies:
   "002304":
     name: "洋河股份"
     sector: "白酒"
+    theme: "Consumer_Staples"
+    ecosystem_role: "downstream_app"
     base_score:
       brand_premium: { score: 75, note: "梦之蓝系列全国化布局，但近年品牌力有所承压" }
       franchise_barrier: { score: 65, note: "宿迁产区 + 万吨陶坛库，但窖池资源弱于川酒" }
@@ -70,6 +82,8 @@ companies:
   "000333":
     name: "美的集团"
     sector: "家用电器"
+    theme: "Advanced_Manufacturing"
+    ecosystem_role: "upstream_resource"
     base_score:
       brand_premium: { score: 82, note: "家电全品类全球龙头，品牌认知度与海尔并驾齐驱" }
       franchise_barrier: { score: 70, note: "全球制造基地 + 深度分销网络，渠道壁垒深厚" }
@@ -80,6 +94,8 @@ companies:
   "000651":
     name: "格力电器"
     sector: "家用电器"
+    theme: "Advanced_Manufacturing"
+    ecosystem_role: "upstream_resource"
     base_score:
       brand_premium: { score: 85, note: "空调行业绝对龙头，'好空调格力造'心智占领极深" }
       franchise_barrier: { score: 72, note: "核心零部件高度自主化，经销商体系改革中" }
@@ -90,6 +106,8 @@ companies:
   "002475":
     name: "立讯精密"
     sector: "电子"
+    theme: "Advanced_Manufacturing"
+    ecosystem_role: "upstream_resource"
     base_score:
       brand_premium: { score: 75, note: "精密制造隐形冠军，苹果核心供应链伙伴" }
       franchise_barrier: { score: 78, note: "精密制造工艺壁垒极高，大客户认证周期长达2-3年" }
@@ -100,6 +118,8 @@ companies:
   "002371":
     name: "北方华创"
     sector: "半导体"
+    theme: "AI_Compute_Infrastructure"
+    ecosystem_role: "upstream_resource"
     base_score:
       brand_premium: { score: 70, note: "国产半导体设备龙头，承载国家替代战略期望" }
       franchise_barrier: { score: 85, note: "刻蚀/薄膜/炉管设备技术壁垒极高，国产替代稀缺标的" }
@@ -110,6 +130,8 @@ companies:
   "603501":
     name: "韦尔股份"
     sector: "半导体"
+    theme: "AI_Compute_Infrastructure"
+    ecosystem_role: "upstream_resource"
     base_score:
       brand_premium: { score: 72, note: "全球CIS领域前三，收购豪威后技术积累跃升" }
       franchise_barrier: { score: 80, note: "图像传感器专利壁垒深厚，手机/汽车双轮驱动" }
@@ -120,6 +142,8 @@ companies:
   "300760":
     name: "迈瑞医疗"
     sector: "医疗器械"
+    theme: "Advanced_Manufacturing"
+    ecosystem_role: "upstream_resource"
     base_score:
       brand_premium: { score: 80, note: "国产医疗器械全球龙头，监护/超声/IVD三大主线" }
       franchise_barrier: { score: 82, note: "三类医疗器械注册周期长，技术门槛与合规壁垒极高" }
@@ -130,6 +154,8 @@ companies:
   "601899":
     name: "紫金矿业"
     sector: "有色金属"
+    theme: "New_Energy_Materials"
+    ecosystem_role: "upstream_resource"
     base_score:
       brand_premium: { score: 70, note: "全球矿业龙头品牌" }
       franchise_barrier: { score: 65, note: "矿产资源壁垒，但周期性极强" }
