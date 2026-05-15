@@ -1,0 +1,529 @@
+# MGFS Top 50 核心股票池模板
+# 投研团队填写指南：
+# 1. 为每家公司填写 base_score 下的 5 个维度评分（0-100）
+# 2. 在 note 字段补充定性分析要点
+# 3. 确保 sector 与 valuation_sector_routing.yaml 中的映射一致
+#
+# 填写期限：2026-05-22 前完成
+# 负责人：投研组
+
+version: "1.0"
+last_updated: "2026-05-15"
+description: "MGFS Top 50 核心股票池 — 静态护城河数据"
+
+scoring_weights:
+  base: { weight: 0.4 }
+  trend: { weight: 0.35 }
+  safety: { weight: 0.25 }
+
+companies:
+  # === 白酒赛道 (4只) ===
+  "600519":
+    name: "贵州茅台"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 95, note: "社交货币属性，议价能力极强" }
+      franchise_barrier: { score: 90, note: "地理标志保护 + 产能壁垒" }
+      switching_cost: { score: 88, note: "用户口味依赖，转换成本极高" }
+      network_effect: { score: 60, note: "无显著网络效应" }
+      cost_advantage: { score: 70, note: "毛利率高但原料成本有波动" }
+
+  "000858":
+    name: "五粮液"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 88, note: "待填写" }
+      franchise_barrier: { score: 82, note: "待填写" }
+      switching_cost: { score: 80, note: "待填写" }
+      network_effect: { score: 55, note: "待填写" }
+      cost_advantage: { score: 68, note: "待填写" }
+
+  "000568":
+    name: "泸州老窖"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "000596":
+    name: "古井贡酒"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 资源/周期赛道 (6只) ===
+  "601899":
+    name: "紫金矿业"
+    sector: "有色金属"
+    base_score:
+      brand_premium: { score: 70, note: "全球矿业龙头品牌" }
+      franchise_barrier: { score: 65, note: "矿产资源壁垒，但周期性极强" }
+      switching_cost: { score: 40, note: "客户转换成本低" }
+      network_effect: { score: 30, note: "无网络效应" }
+      cost_advantage: { score: 75, note: "规模化开采成本优势显著" }
+
+  "600028":
+    name: "中国石化"
+    sector: "煤炭"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "601088":
+    name: "中国神华"
+    sector: "煤炭"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "603993":
+    name: "洛阳钼业"
+    sector: "有色金属"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "600547":
+    name: "山东黄金"
+    sector: "有色金属"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "601600":
+    name: "中国铝业"
+    sector: "有色金属"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 新能源赛道 (6只) ===
+  "002594":
+    name: "比亚迪"
+    sector: "新能源汽车"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "300750":
+    name: "宁德时代"
+    sector: "新能源汽车"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "601012":
+    name: "隆基绿能"
+    sector: "新能源"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "600438":
+    name: "通威股份"
+    sector: "新能源"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "002129":
+    name: "TCL中环"
+    sector: "新能源"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "300274":
+    name: "阳光电源"
+    sector: "新能源"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 出海/制造赛道 (6只) ===
+  "000333":
+    name: "美的集团"
+    sector: "家电"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "000651":
+    name: "格力电器"
+    sector: "家电"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "002475":
+    name: "立讯精密"
+    sector: "电子"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "002371":
+    name: "北方华创"
+    sector: "半导体"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "603501":
+    name: "韦尔股份"
+    sector: "半导体"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "300760":
+    name: "迈瑞医疗"
+    sector: "医疗器械"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 金融赛道 (4只) ===
+  "600036":
+    name: "招商银行"
+    sector: "银行"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "000001":
+    name: "平安银行"
+    sector: "银行"
+    base_score:
+      brand_premium: { score: 60, note: "品牌认知度中等" }
+      franchise_barrier: { score: 75, note: "金融牌照壁垒" }
+      switching_cost: { score: 55, note: "账户迁移成本一般" }
+      network_effect: { score: 55, note: "网点规模效应，但无网络效应" }
+      cost_advantage: { score: 65, note: "资金成本优势一般" }
+
+  "601318":
+    name: "中国平安"
+    sector: "保险"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "600030":
+    name: "中信证券"
+    sector: "证券"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 医药赛道 (4只) ===
+  "600276":
+    name: "恒瑞医药"
+    sector: "医药"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "603259":
+    name: "药明康德"
+    sector: "医药"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "000538":
+    name: "云南白药"
+    sector: "医药"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "300015":
+    name: "爱尔眼科"
+    sector: "医药"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 消费赛道 (4只) ===
+  "600887":
+    name: "伊利股份"
+    sector: "食品饮料"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "603288":
+    name: "海天味业"
+    sector: "食品饮料"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "002304":
+    name: "洋河股份"
+    sector: "白酒"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "000895":
+    name: "双汇发展"
+    sector: "食品饮料"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 科技/通信赛道 (4只) ===
+  "000063":
+    name: "中兴通讯"
+    sector: "通信"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "600941":
+    name: "中国移动"
+    sector: "通信"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "688981":
+    name: "中芯国际"
+    sector: "半导体"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "002230":
+    name: "科大讯飞"
+    sector: "人工智能"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 地产/基建赛道 (4只) ===
+  "000002":
+    name: "万科A"
+    sector: "房地产"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "601668":
+    name: "中国建筑"
+    sector: "建筑"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "601390":
+    name: "中国中铁"
+    sector: "建筑"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "600048":
+    name: "保利发展"
+    sector: "房地产"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 互联网/平台赛道 (4只) ===
+  "00700":
+    name: "腾讯控股"
+    sector: "互联网"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "03690":
+    name: "美团"
+    sector: "互联网"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "09988":
+    name: "阿里巴巴"
+    sector: "互联网"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "09618":
+    name: "京东集团"
+    sector: "互联网"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  # === 物流/交运赛道 (4只) ===
+  "002352":
+    name: "顺丰控股"
+    sector: "物流"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "601919":
+    name: "中远海控"
+    sector: "航运"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "601006":
+    name: "大秦铁路"
+    sector: "交运"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
+
+  "600009":
+    name: "上海机场"
+    sector: "交运"
+    base_score:
+      brand_premium: { score: 0, note: "待填写" }
+      franchise_barrier: { score: 0, note: "待填写" }
+      switching_cost: { score: 0, note: "待填写" }
+      network_effect: { score: 0, note: "待填写" }
+      cost_advantage: { score: 0, note: "待填写" }
