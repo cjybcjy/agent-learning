@@ -26,3 +26,13 @@ companies:
       switching_cost: { score: 55, note: "账户迁移成本一般" }
       network_effect: { score: 55, note: "网点规模效应，但无网络效应" }
       cost_advantage: { score: 65, note: "资金成本优势一般" }
+
+  "601899":
+    name: "紫金矿业"
+    sector: "有色金属"
+    base_score:
+      brand_premium: { score: 70, note: "全球矿业龙头品牌" }
+      franchise_barrier: { score: 65, note: "矿产资源壁垒，但周期性极强" }
+      switching_cost: { score: 40, note: "客户转换成本低" }
+      network_effect: { score: 30, note: "无网络效应" }
+      cost_advantage: { score: 75, note: "规模化开采成本优势显著" }

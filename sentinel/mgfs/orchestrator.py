@@ -77,14 +77,15 @@ class MGFSOrchestrator:
                 report_sections={"overall_confidence": 0.0, "watermark": "[数据残缺 / 评估挂起]"},
             )
 
-        raw_total = self._compute_raw_total(factor_scores)
+        adjusted_weights = self._get_adjusted_weights(factor_scores)
+        raw_total = self._compute_raw_total(factor_scores, adjusted_weights)
         multiplier = self.policy_multipliers.get(policy_rating, 1.0)
         final_score = raw_total * multiplier
         triggered, alert_level = self._check_circuit_breakers(
             factor_scores, policy_rating
         )
         rating, action = self._classify_rating(final_score, alert_level)
-        overall_confidence = self._compute_overall_confidence(factor_scores)
+        overall_confidence = self._compute_overall_confidence(factor_scores, adjusted_weights)
         if overall_confidence < 0.5:
             watermark = "[数据残缺 / 评估挂起]"
         elif overall_confidence < 0.8:
@@ -103,7 +104,11 @@ class MGFSOrchestrator:
             action=action,
             circuit_breakers_triggered=triggered,
             alert_level=alert_level,
-            report_sections={"overall_confidence": overall_confidence, "watermark": watermark},
+            report_sections={
+                "overall_confidence": overall_confidence,
+                "watermark": watermark,
+                "adjusted_weights": adjusted_weights,
+            },
         )
 
     def _run_plugins(self, target: TargetInfo) -> dict[str, FactorScore]:
@@ -124,26 +129,57 @@ class MGFSOrchestrator:
                 )
         return scores
 
-    def _compute_overall_confidence(
+    def _get_adjusted_weights(
         self, factor_scores: dict[str, FactorScore]
+    ) -> dict[str, float]:
+        """Return weights redistributed when low-confidence plugins are dropped.
+
+        Plugins with confidence < 0.5 have their weight set to 0.
+        Remaining weights are re-normalized proportionally.
+        """
+        # Step 1: Mark low-confidence plugins as inactive
+        active: dict[str, float] = {}
+        for key, score in factor_scores.items():
+            w = self.scoring_weights.get(key, 0.0)
+            if score.confidence >= 0.5 and w > 0:
+                active[key] = w
+
+        if not active:
+            return {key: 0.0 for key in factor_scores}
+
+        # Step 2: Re-normalize remaining weights
+        total_active = sum(active.values())
+        adjusted: dict[str, float] = {}
+        for key in factor_scores:
+            adjusted[key] = active.get(key, 0.0) / total_active if total_active > 0 else 0.0
+        return adjusted
+
+    def _compute_overall_confidence(
+        self,
+        factor_scores: dict[str, FactorScore],
+        adjusted_weights: dict[str, float] | None = None,
     ) -> float:
         if not factor_scores:
             return 0.0
+        weights = adjusted_weights if adjusted_weights is not None else self.scoring_weights
         total_weight = 0.0
         weighted_confidence = 0.0
         for key, score in factor_scores.items():
-            w = self.scoring_weights.get(key, 0.0)
+            w = weights.get(key, 0.0)
             total_weight += w
             weighted_confidence += score.confidence * w
         return weighted_confidence / total_weight if total_weight > 0 else 0.0
 
     def _compute_raw_total(
-        self, factor_scores: dict[str, FactorScore]
+        self,
+        factor_scores: dict[str, FactorScore],
+        adjusted_weights: dict[str, float] | None = None,
     ) -> float:
+        weights = adjusted_weights if adjusted_weights is not None else self.scoring_weights
         total = 0.0
         weight_sum = 0.0
         for key, score in factor_scores.items():
-            w = self.scoring_weights.get(key, 0.0)
+            w = weights.get(key, 0.0)
             total += score.normalized_score * 100 * w
             weight_sum += w
         return total / weight_sum if weight_sum > 0 else 0.0

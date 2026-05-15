@@ -24,8 +24,15 @@ sectors:
     policy_rating: "transition"
     multiplier: 0.8
     note: "能源安全保供 + 双碳转型压力"
+  "有色金属":
+    policy_rating: "neutral"
+    multiplier: 1.0
+    note: "周期行业，政策中性"
 
 overrides:
   "600519":
     multiplier: 1.1
     note: "消费品龙头，政策风险极低"
+  "601899":
+    multiplier: 1.0
+    note: "矿业龙头，政策中性"

@@ -3,13 +3,20 @@ from __future__ import annotations
 import random
 from abc import ABC, abstractmethod
 
+from sentinel.domain.models import Market
+
 
 class ValuationFetcher(ABC):
     @abstractmethod
     def fetch_history(
-        self, symbol: str, market: str, metric: str, years: int = 5
+        self, symbol: str, market: Market, metric: str, years: int = 5
     ) -> list[float]:
-        """Return a list of daily metric values for the given symbol."""
+        """Fetch historical daily values for a valuation metric.
+
+        Returns:
+            List of daily metric values (most recent last).
+        """
+        raise NotImplementedError
 
 
 class MockValuationFetcher(ValuationFetcher):
@@ -17,7 +24,7 @@ class MockValuationFetcher(ValuationFetcher):
         self._rng = random.Random(seed)
 
     def fetch_history(
-        self, symbol: str, market: str, metric: str, years: int = 5
+        self, symbol: str, market: Market, metric: str, years: int = 5
     ) -> list[float]:
         days = years * 250
         base = self._rng.gauss(20.0, 5.0)
