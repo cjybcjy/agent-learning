@@ -146,6 +146,117 @@ def build_feishu_card(decision: InvestmentDecision) -> dict[str, Any]:
     return content
 
 
+_ROLE_LABELS = {
+    "symbiotic_infra": "共生基础设施",
+    "upstream_resource": "上游资源/设备",
+    "downstream_app": "下游应用",
+    "core_arena": "核心竞技场",
+}
+
+_ROLE_EMOJI = {
+    "symbiotic_infra": "🟢",
+    "upstream_resource": "🔵",
+    "downstream_app": "🟡",
+    "core_arena": "🔴",
+}
+
+
+def build_ecosystem_scan_report(scan_result) -> dict[str, Any]:
+    """Build a Feishu interactive card payload from an Ecosystem ScanResult."""
+    from sentinel.mgfs.scanner import ScanResult
+    from sentinel.mgfs.orchestrator import InvestmentDecision
+
+    assert isinstance(scan_result, ScanResult)
+
+    elements: list[dict[str, Any]] = []
+
+    # Theme info block
+    theme_info = (
+        f"**主题**: {scan_result.theme}\n"
+        f"**扫描策略**: 产业链全角色扫描\n"
+        f"**候选标的**: {scan_result.total_candidates} 家\n"
+        f"**通过筛选**: {scan_result.filtered_count} 家"
+    )
+    elements.append(
+        {
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": theme_info},
+        }
+    )
+    elements.append({"tag": "hr"})
+
+    # Per-report blocks
+    for decision in scan_result.reports:
+        assert isinstance(decision, InvestmentDecision)
+        role = decision.target.ecosystem_role or "unknown"
+        role_label = _ROLE_LABELS.get(role, role)
+        role_emoji = _ROLE_EMOJI.get(role, "⚪")
+        rating_emoji = _RATING_EMOJI.get(decision.rating, "⚪")
+
+        # Moat score
+        moat_score = decision.factor_scores.get("moat")
+        moat_line = ""
+        if moat_score:
+            moat_line = f"**护城河**: {moat_score.score:.1f} (置信度: {moat_score.confidence:.0%})\n"
+
+        # Valuation zone
+        valuation_score = decision.factor_scores.get("valuation")
+        zone = ""
+        if valuation_score:
+            zone = valuation_score.details.get("zone", "")
+        zone_emoji = _zone_emoji(zone)
+
+        report_text = (
+            f"{role_emoji} **{decision.target.symbol}** — {decision.target.name} ({role_label})\n"
+            f"{moat_line}"
+            f"{zone_emoji} **估值区间**: {zone or 'N/A'}\n"
+            f"**最终得分**: {decision.final_score:.2f}\n"
+            f"{rating_emoji} **评级**: {decision.rating}\n"
+            f"**建议动作**: {decision.action}"
+        )
+
+        elements.append(
+            {
+                "tag": "div",
+                "text": {"tag": "lark_md", "content": report_text},
+            }
+        )
+        elements.append({"tag": "hr"})
+
+    # Summary notes
+    summary = scan_result.summary or {}
+    skipped_by_veto = summary.get("skipped_by_veto", 0)
+    skipped_by_zone = summary.get("skipped_by_zone", 0)
+    skipped_by_moat = summary.get("skipped_by_moat", 0)
+
+    if skipped_by_veto or skipped_by_zone or skipped_by_moat:
+        summary_lines = ["**筛选统计**"]
+        if skipped_by_veto:
+            summary_lines.append(f"- 熔断跳过: {skipped_by_veto} 家")
+        if skipped_by_zone:
+            summary_lines.append(f"- 估值区间跳过: {skipped_by_zone} 家")
+        if skipped_by_moat:
+            summary_lines.append(f"- 护城河不足跳过: {skipped_by_moat} 家")
+        elements.append(
+            {
+                "tag": "div",
+                "text": {"tag": "lark_md", "content": "\n".join(summary_lines)},
+            }
+        )
+
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "template": "green",
+            "title": {
+                "tag": "plain_text",
+                "content": "📊 MGFS 产业链价值扫描报告",
+            },
+        },
+        "elements": elements,
+    }
+
+
 def build_text_report(decision: InvestmentDecision) -> str:
     """Build a plain-text report suitable for CLI or simple messaging."""
     lines = [

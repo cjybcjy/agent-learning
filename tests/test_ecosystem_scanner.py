@@ -153,3 +153,46 @@ def test_scanner_skips_veto_and_low_moat(tmp_path: Path) -> None:
     assert result.summary["skipped_by_veto"] == 1
     assert result.summary["skipped_by_moat"] == 1
     assert result.summary["passed_all_gates"] == 1
+
+
+def test_build_ecosystem_report_generates_card():
+    from sentinel.publishers.mgfs_report import build_ecosystem_scan_report
+    from sentinel.mgfs.scanner import ScanResult
+    from sentinel.mgfs.orchestrator import InvestmentDecision
+    from sentinel.mgfs.factor_plugin import TargetInfo, FactorScore, AlertLevel
+    from sentinel.domain.models import Market
+    from datetime import datetime
+
+    target = TargetInfo(
+        symbol="600900", market=Market.A_SHARE, asset_class="equity",
+        name="长江电力", sector="电力",
+        theme="AI_Compute_Infrastructure", ecosystem_role="symbiotic_infra",
+    )
+    decision = InvestmentDecision(
+        target=target,
+        generated_at=datetime.now(),
+        factor_scores={
+            "moat": FactorScore(factor_key="moat", factor_name="护城河", score=95, confidence=0.9, details={"zone": "strong_buy"}),
+            "valuation": FactorScore(factor_key="valuation", factor_name="估值", score=32, confidence=0.8, details={"zone": "accumulate"}),
+        },
+        raw_total=88.5,
+        policy_multiplier=1.1,
+        final_score=97.35,
+        rating="Strong Buy",
+        action="建议配底仓",
+        circuit_breakers_triggered=[],
+        alert_level=AlertLevel.GREEN_PASS,
+    )
+    result = ScanResult(
+        theme="AI_Compute_Infrastructure",
+        total_candidates=5,
+        filtered_count=1,
+        reports=[decision],
+        summary={"skipped_by_veto": 3, "skipped_by_zone": 1},
+    )
+
+    card = build_ecosystem_scan_report(result)
+    assert card["header"]["title"]["content"] == "📊 MGFS 产业链价值扫描报告"
+    assert "AI_Compute_Infrastructure" in str(card)
+    assert "600900" in str(card)
+    assert "共生基础设施" in str(card)
