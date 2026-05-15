@@ -26,9 +26,11 @@ class MoatFactorPlugin(BaseFactorPlugin):
         self,
         config_path: Path | None = None,
         aggregator: MetricsAggregator | None = None,
+        fallback_score: float | None = None,
     ) -> None:
         self.config_path = config_path
         self.aggregator = aggregator
+        self.fallback_score = fallback_score
         self._config: dict | None = None
 
     def _load_config(self) -> dict:
@@ -54,6 +56,24 @@ class MoatFactorPlugin(BaseFactorPlugin):
 
         company_cfg = companies.get(target.symbol)
         if company_cfg is None:
+            if self.fallback_score is not None:
+                return FactorScore(
+                    factor_key=self.factor_key,
+                    factor_name=self.factor_name,
+                    score=self.fallback_score,
+                    max_score=100.0,
+                    weight=self.default_weight,
+                    details={
+                        "base_score": self.fallback_score,
+                        "base_weight": weights.get("base", {}).get("weight", self.DEFAULT_BASE_WEIGHT),
+                        "trend_score": 0.0,
+                        "trend_weight": weights.get("trend", {}).get("weight", self.DEFAULT_TREND_WEIGHT),
+                        "safety_score": 0.0,
+                        "safety_weight": weights.get("safety", {}).get("weight", self.DEFAULT_SAFETY_WEIGHT),
+                    },
+                    confidence=self.FALLBACK_CONFIDENCE,
+                    warnings=[f"未找到 {target.symbol} 的静态评分记录，使用 fallback 分数 {self.fallback_score}"],
+                )
             return FactorScore(
                 factor_key=self.factor_key,
                 factor_name=self.factor_name,

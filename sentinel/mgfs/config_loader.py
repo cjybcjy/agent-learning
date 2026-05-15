@@ -35,6 +35,7 @@ def build_orchestrator(
     config: dict,
     config_dir: Path | None = None,
     fetchers: dict[str, Any] | None = None,
+    plugin_kwargs: dict[str, dict[str, Any]] | None = None,
 ) -> MGFSOrchestrator:
     """Build an MGFSOrchestrator instance from a parsed configuration dict.
 
@@ -45,6 +46,8 @@ def build_orchestrator(
         config_dir: Optional directory containing plugin-specific config files.
         fetchers: Optional dict mapping plugin key to a pre-built fetcher
             instance (e.g. {"valuation": EastmoneyValuationFetcher()}).
+        plugin_kwargs: Optional dict mapping plugin key to extra kwargs
+            passed to the plugin constructor (e.g. {"moat": {"fallback_score": 60.0}}).
 
     Returns:
         An initialized MGFSOrchestrator with loaded plugins and settings.
@@ -63,7 +66,7 @@ def build_orchestrator(
             continue
         try:
             plugin = _load_plugin(
-                module_config["class_path"], config_dir, key, fetchers
+                module_config["class_path"], config_dir, key, fetchers, plugin_kwargs
             )
             plugins.append(plugin)
         except Exception:
@@ -87,6 +90,7 @@ def _load_plugin(
     config_dir: Path | None = None,
     key: str = "",
     fetchers: dict[str, Any] | None = None,
+    plugin_kwargs: dict[str, dict[str, Any]] | None = None,
 ) -> BaseFactorPlugin:
     module_name, class_name = class_path.rsplit(".", 1)
     module = importlib.import_module(module_name)
@@ -101,6 +105,10 @@ def _load_plugin(
             kwargs["config_path"] = config_dir / config_file
     if fetchers and "fetcher" in sig.parameters and key in fetchers:
         kwargs["fetcher"] = fetchers[key]
+    if plugin_kwargs and key in plugin_kwargs:
+        for k, v in plugin_kwargs[key].items():
+            if k in sig.parameters:
+                kwargs[k] = v
     return cls(**kwargs)
 
 

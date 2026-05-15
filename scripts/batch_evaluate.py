@@ -221,6 +221,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("reports/batch_eval.csv"), help="Output CSV path")
     parser.add_argument("--policy", default="neutral", help="Policy rating to apply")
     parser.add_argument("--limit", type=int, default=0, help="Limit number of stocks (0 = all)")
+    parser.add_argument("--demo-moat-score", type=float, default=0, help="Demo mode: use this score when moat data is missing (0 = disabled)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
     args = parser.parse_args()
 
@@ -240,8 +241,15 @@ def main() -> int:
     from sentinel.mgfs.data.eastmoney_fetcher import EastmoneyValuationFetcher
 
     fetchers = {"valuation": EastmoneyValuationFetcher()}
+    plugin_kwargs: dict[str, dict[str, Any]] = {}
+    if args.demo_moat_score > 0:
+        plugin_kwargs["moat"] = {"fallback_score": args.demo_moat_score}
+        logger.info("Demo mode: using fallback moat score %.1f", args.demo_moat_score)
     orchestrator = build_orchestrator(
-        config, config_dir=settings.resolved_config_dir, fetchers=fetchers
+        config,
+        config_dir=settings.resolved_config_dir,
+        fetchers=fetchers,
+        plugin_kwargs=plugin_kwargs,
     )
     logger.info("Orchestrator loaded with plugins: %s", list(orchestrator.plugins.keys()))
 
