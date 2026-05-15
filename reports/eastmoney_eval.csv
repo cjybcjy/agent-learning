@@ -1,0 +1,16 @@
+﻿symbol,name,sector,policy_rating,raw_total,final_score,rating,action,alert_level,overall_confidence,watermark,circuit_breakers_triggered,moat_score,moat_confidence,valuation_score,valuation_confidence,valuation_percentile,valuation_zone,valuation_metric,policy_score
+600519,贵州茅台,白酒,neutral,55.7,55.7,Avoid,回避,green_pass,0.6499999999999999,[数据部分缺失],0,32.24,0.5,94.79,0.9,10.413223140495868,strong_buy,PE_TTM,110.0
+000858,五粮液,白酒,neutral,22.83,22.83,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,60.88,0.9,56.94214876033058,hold,PE_TTM,100.0
+000001,平安银行,银行,neutral,52.15,52.15,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,24.8,0.5,97.74,0.9,3.3884297520661155,strong_buy,PB,100.0
+600036,招商银行,银行,neutral,36.2,36.2,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,96.53,0.9,5.206611570247934,strong_buy,PB,100.0
+601899,紫金矿业,有色金属,neutral,25.42,25.42,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],2,22.4,0.5,30.46,0.9,78.67768595041322,avoid,PB,100.0
+600028,中国石化,煤炭,neutral,26.53,26.53,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,70.75,0.9,35.9504132231405,hold,PB,80.0
+601318,中国平安,保险,neutral,34.71,34.71,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,92.56,0.9,14.87603305785124,strong_buy,PE_TTM,100.0
+000002,万科A,房地产,neutral,0.0,0.0,Avoid,回避,soft_veto,0.5,[数据部分缺失],1,0.0,0.5,0.0,0.3,-1.0,invalid,PE_TTM,60.0
+002594,比亚迪,新能源汽车,neutral,25.23,25.23,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,67.29,0.9,49.256198347107436,hold,PE_TTM,120.0
+300750,宁德时代,新能源汽车,neutral,26.76,26.76,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,71.35,0.9,44.3801652892562,hold,PE_TTM,120.0
+600276,恒瑞医药,医药,neutral,36.31,36.31,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,96.82,0.9,6.363636363636363,strong_buy,PE_TTM,100.0
+000568,泸州老窖,白酒,neutral,34.38,34.38,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,91.69,0.9,16.611570247933884,strong_buy,PE_TTM,100.0
+601012,隆基绿能,新能源,neutral,0.0,0.0,Avoid,回避,soft_veto,0.5,[数据部分缺失],1,0.0,0.5,0.0,0.3,-1.0,invalid,PE_TTM,100.0
+600887,伊利股份,食品饮料,neutral,35.81,35.81,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,0.0,0.5,95.5,0.9,9.008264462809917,strong_buy,PE_TTM,100.0
+000063,中兴通讯,通信,neutral,0.41,0.41,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],3,0.0,0.5,1.1,0.9,99.3388429752066,avoid,PE_TTM,100.0

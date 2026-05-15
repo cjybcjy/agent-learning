@@ -23,6 +23,7 @@ scoring_formula:
   moat: { weight: 0.5 }
   valuation: { weight: 0.3 }
   policy: { weight: 0.0 }
+  timing: { weight: 0.1 }
 
 policy_multiplier:
   core_support: { multiplier: 1.2 }

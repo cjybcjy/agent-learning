@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-05-15T16:16:22.336160",
+  "total_stocks": 300,
+  "successful_evaluations": 300,
+  "rating_distribution": {
+    "Hold/Watch": 150,
+    "Avoid": 137,
+    "Accumulate": 13
+  },
+  "alert_distribution": {
+    "green_pass": 241,
+    "hard_veto": 57,
+    "soft_veto": 2
+  }
+}

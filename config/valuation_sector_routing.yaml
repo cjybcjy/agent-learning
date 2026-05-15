@@ -16,6 +16,17 @@ archetypes:
       avoid:       { percentile_max: 100, score_range: [0, 50]  }
     circuit_breakers:
       hard_veto_percentile: 90
+    timing:
+      ideal_band: 0.02
+      acceptable_band: 0.05
+      slope_veto_threshold: -0.03
+      max_bonus: 10.0
+      max_penalty: -40.0
+      bullish_ref: 0.02
+      atr_baseline: 0.015
+      atr_k: 1.0
+      atr_min_mult: 0.5
+      atr_max_mult: 2.0
 
   heavy_asset_cyclical:
     label: "重资产与强周期"
@@ -30,6 +41,17 @@ archetypes:
       avoid:       { percentile_max: 100, score_range: [0, 50]  }
     circuit_breakers:
       hard_veto_percentile: 85
+    timing:
+      ideal_band: 0.03
+      acceptable_band: 0.08
+      slope_veto_threshold: -0.025
+      max_bonus: 10.0
+      max_penalty: -40.0
+      bullish_ref: 0.02
+      atr_baseline: 0.020
+      atr_k: 1.0
+      atr_min_mult: 0.5
+      atr_max_mult: 2.0
 
 sector_to_archetype:
   "白酒": "traditional_growth"

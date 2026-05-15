@@ -1,0 +1,6 @@
+﻿symbol,name,sector,policy_rating,raw_total,final_score,rating,action,alert_level,overall_confidence,watermark,circuit_breakers_triggered,moat_score,moat_confidence,valuation_score,valuation_confidence,valuation_percentile,valuation_zone,valuation_metric,policy_score
+000001,平安银行,,neutral,43.55,43.55,Avoid,回避,soft_veto,0.6499999999999999,[数据部分缺失],1,24.8,0.5,74.79,0.9,40.247933884297524,hold,PE_TTM,100.0
+000002,万科A,,neutral,60.0,60.0,Hold/Watch,等待拐点,green_pass,0.5,[数据部分缺失],0,60.0,0.5,0.0,0.3,-1.0,invalid,PE_TTM,100.0
+000063,中兴通讯,,neutral,37.91,37.91,Avoid,一票否决：禁止买入,hard_veto,0.6499999999999999,[数据部分缺失],1,60.0,0.5,1.1,0.9,99.3388429752066,avoid,PE_TTM,100.0
+000100,TCL科技,,neutral,68.62,68.62,Hold/Watch,等待拐点,green_pass,0.6499999999999999,[数据部分缺失],0,60.0,0.5,82.98,0.9,29.357798165137616,accumulate,PE_TTM,100.0
+000157,中联重科,,neutral,68.9,68.9,Hold/Watch,等待拐点,green_pass,0.6499999999999999,[数据部分缺失],0,60.0,0.5,83.74,0.9,28.34710743801653,accumulate,PE_TTM,100.0

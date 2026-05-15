@@ -18,12 +18,15 @@ def test_valuation_plugin_returns_real_score():
     assert "zone" in score.details
 
 
-def test_timing_plugin_returns_mock_score():
+def test_timing_plugin_returns_scored_result():
     plugin = TimingFactorPlugin()
     target = TargetInfo(symbol="BTC", market=Market.CRYPTO, asset_class="crypto")
     score = plugin.evaluate(target)
 
     assert score.factor_key == "timing"
     assert score.factor_name == "量化择时"
-    assert score.score == 50.0
-    assert score.details["note"] == "mock implementation — Step 2"
+    assert 0 <= score.score <= 100
+    assert "ma60" in score.details
+    assert "bias" in score.details
+    assert "trend_slope" in score.details
+    assert "atr14" in score.details

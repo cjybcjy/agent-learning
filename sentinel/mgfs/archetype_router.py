@@ -66,6 +66,7 @@ class ArchetypeRouter:
 
         # Priority 2: sector mapping
         if sector is not None:
+            sector = sector.strip().replace(" ", "")
             sector_map = config.get("sector_to_archetype", {})
             archetype_name = sector_map.get(sector)
             if archetype_name is not None:
