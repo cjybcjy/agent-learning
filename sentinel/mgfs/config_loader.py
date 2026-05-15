@@ -103,6 +103,10 @@ def _load_plugin(
         config_file = _plugin_config_file(key)
         if config_file:
             kwargs["config_path"] = config_dir / config_file
+    if config_dir is not None and "ecosystem_config_path" in sig.parameters:
+        eco_file = _plugin_config_file("ecosystem")
+        if eco_file:
+            kwargs["ecosystem_config_path"] = config_dir / eco_file
     if fetchers and "fetcher" in sig.parameters and key in fetchers:
         kwargs["fetcher"] = fetchers[key]
     if plugin_kwargs and key in plugin_kwargs:
@@ -118,6 +122,7 @@ def _plugin_config_file(key: str) -> str | None:
         "policy": "policy_whitelist.yaml",
         "valuation": "valuation_sector_routing.yaml",
         "timing": "valuation_sector_routing.yaml",
+        "ecosystem": "ecosystem_themes.yaml",
     }
     return mapping.get(key)
 

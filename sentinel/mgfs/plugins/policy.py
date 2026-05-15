@@ -12,9 +12,15 @@ class PolicyFactorPlugin(BaseFactorPlugin):
     factor_name = "国策环境"
     default_weight = 0.0
 
-    def __init__(self, config_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        config_path: Path | None = None,
+        ecosystem_config_path: Path | None = None,
+    ) -> None:
         self.config_path = config_path
+        self.ecosystem_config_path = ecosystem_config_path
         self._config: dict | None = None
+        self._ecosystem_config: dict | None = None
 
     def _load_config(self) -> dict:
         if self._config is not None:
@@ -24,6 +30,15 @@ class PolicyFactorPlugin(BaseFactorPlugin):
         with self.config_path.open("r", encoding="utf-8") as handle:
             self._config = yaml.safe_load(handle) or {}
         return self._config
+
+    def _load_ecosystem_config(self) -> dict:
+        if self._ecosystem_config is not None:
+            return self._ecosystem_config
+        if self.ecosystem_config_path is None or not self.ecosystem_config_path.exists():
+            return {"hot_themes": [], "role_premiums": {}}
+        with self.ecosystem_config_path.open("r", encoding="utf-8") as handle:
+            self._ecosystem_config = yaml.safe_load(handle) or {}
+        return self._ecosystem_config
 
     def evaluate(self, target: TargetInfo) -> FactorScore:
         cfg = self._load_config()
@@ -45,6 +60,19 @@ class PolicyFactorPlugin(BaseFactorPlugin):
             multiplier = default
             note = ""
 
+        # 4. Ecosystem role premium for hot themes
+        ecosystem_premium = 0.0
+        eco_cfg = self._load_ecosystem_config()
+        hot_themes = set(eco_cfg.get("hot_themes", []))
+        if target.theme in hot_themes and target.ecosystem_role:
+            role_premiums = eco_cfg.get("role_premiums", {})
+            ecosystem_premium = float(role_premiums.get(target.ecosystem_role, 0.0))
+            if ecosystem_premium != 0.0:
+                note = f"{note} 生态红利({target.ecosystem_role}: {ecosystem_premium:+.2f})".strip()
+
+        multiplier += ecosystem_premium
+        multiplier = max(0.5, min(2.0, multiplier))
+
         return FactorScore(
             factor_key=self.factor_key,
             factor_name=self.factor_name,
@@ -55,6 +83,7 @@ class PolicyFactorPlugin(BaseFactorPlugin):
                 "multiplier": multiplier,
                 "policy_rating": self._rating_from_multiplier(multiplier),
                 "note": note,
+                "ecosystem_premium": ecosystem_premium,
             },
             confidence=1.0,
         )
