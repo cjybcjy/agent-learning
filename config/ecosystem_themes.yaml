@@ -1,0 +1,14 @@
+version: "1.0"
+description: "MGFS 产业链生态主题配置 — 热主题与生态角色溢价规则"
+
+# 当前处于爆发期的宏观主题
+hot_themes:
+  - "AI_Compute_Infrastructure"
+  - "New_Energy_Materials"
+
+# 生态角色溢价规则
+role_premiums:
+  symbiotic_infra: 0.10   # +10% 确定性溢价
+  upstream_resource: 0.0
+  downstream_app: 0.0
+  core_arena: -0.05       # 核心绞肉机，风险折价
