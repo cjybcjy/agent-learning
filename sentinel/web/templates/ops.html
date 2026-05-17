@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="bg-white rounded-lg shadow p-6 mb-6">
+  <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+    <i data-lucide="file-cog" class="w-5 h-5"></i> 配置中心
+  </h2>
+
+  <div class="flex gap-2 mb-4">
+    <button hx-get="/api/config/load/moat_static_base.yaml"
+            hx-target="#config-editor-container"
+            class="px-3 py-1 border rounded hover:bg-gray-50 text-sm">护城河配置</button>
+    <button hx-get="/api/config/load/valuation_sector_routing.yaml"
+            hx-target="#config-editor-container"
+            class="px-3 py-1 border rounded hover:bg-gray-50 text-sm">估值路由</button>
+    <button hx-get="/api/config/load/policy_whitelist.yaml"
+            hx-target="#config-editor-container"
+            class="px-3 py-1 border rounded hover:bg-gray-50 text-sm">政策白名单</button>
+    <button hx-get="/api/config/load/ecosystem_themes.yaml"
+            hx-target="#config-editor-container"
+            class="px-3 py-1 border rounded hover:bg-gray-50 text-sm">生态主题</button>
+  </div>
+
+  <div id="config-editor-container">
+    <div class="text-gray-400 text-sm">点击上方按钮加载配置文件</div>
+  </div>
+</section>
+
+<section class="bg-white rounded-lg shadow p-6">
+  <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+    <i data-lucide="activity" class="w-5 h-5"></i> 实盘流水线
+  </h2>
+  <div class="text-gray-400 text-sm">实盘流水线将在后续任务中实现。</div>
+</section>
+
+{% endblock %}

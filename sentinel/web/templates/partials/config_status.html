@@ -1,0 +1,8 @@
+{% if is_valid %}
+<div class="text-green-600 text-sm font-medium">{{ message }}</div>
+{% else %}
+<div class="text-red-600 text-sm">
+  <div class="font-medium mb-1">校验失败</div>
+  <pre class="bg-red-50 p-2 rounded">{{ message }}</pre>
+</div>
+{% endif %}
