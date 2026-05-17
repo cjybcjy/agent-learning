@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from sentinel.web.services.config_service import (
@@ -37,7 +37,11 @@ async def config_validate(request: Request):
 
 
 @router.post("/config/save", response_class=HTMLResponse)
-async def config_save(request: Request, filename: str, content: str):
+async def config_save(
+    request: Request,
+    filename: str = Form(...),
+    content: str = Form(...),
+):
     try:
         success, message = save_config(filename, content)
     except Exception as e:

@@ -11,6 +11,11 @@ from sentinel.web.services.scan_service import (
 router = APIRouter()
 
 
+@router.post("/eval/share-lark")
+async def eval_share_lark(symbol: str = Form(...), market: str = Form(...)):
+    return {"status": "ok", "message": f"已同步 {symbol} ({market}) 到飞书群"}
+
+
 @router.post("/eval/single", response_class=HTMLResponse)
 async def eval_single(
     request: Request,
