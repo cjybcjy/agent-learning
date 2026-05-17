@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="bg-white rounded-lg shadow p-6 mb-6">
+  <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+    <i data-lucide="search" class="w-5 h-5"></i> 单票评估
+  </h2>
+  <form hx-post="/api/eval/single"
+        hx-target="#eval-result"
+        hx-swap="innerHTML"
+        hx-indicator="#eval-loading">
+    <div class="flex flex-wrap gap-3">
+      <input name="symbol" placeholder="股票代码 (如 600519)" required
+             class="border rounded px-3 py-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <select name="market" class="border rounded px-3 py-2 w-32">
+        <option value="A_SHARE">A股</option>
+        <option value="HK">港股</option>
+        <option value="US">美股</option>
+      </select>
+      <select name="policy" class="border rounded px-3 py-2 w-32">
+        <option value="neutral">政策: 中性</option>
+        <option value="favorable">政策: favorable</option>
+        <option value="core_support">政策: 核心支持</option>
+      </select>
+      <button type="submit"
+              class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-1">
+        <i data-lucide="play" class="w-4 h-4"></i> 评估
+      </button>
+    </div>
+  </form>
+  <div id="eval-loading" class="htmx-indicator mt-4 text-gray-500">评估中，请稍候...</div>
+  <div id="eval-result" class="mt-4"></div>
+</section>
+
+<section class="bg-white rounded-lg shadow p-6">
+  <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+    <i data-lucide="radar" class="w-5 h-5"></i> 生态雷达
+  </h2>
+  <!-- Placeholder for ecosystem scanner (Task 4) -->
+  <div class="text-gray-500 text-sm">生态雷达舱将在后续任务中实现。</div>
+</section>
+
+{% endblock %}

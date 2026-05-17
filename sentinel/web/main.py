@@ -12,6 +12,7 @@ def create_app() -> FastAPI:
     # Templates
     template_dir = Path(__file__).parent / "templates"
     app.state.templates = Jinja2Templates(directory=str(template_dir))
+    app.state.templates.env.globals.update({"enumerate": enumerate, "zip": zip})
 
     # Routers
     app.include_router(pages.router)
