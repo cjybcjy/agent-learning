@@ -12,12 +12,12 @@ async def root():
 @router.get("/dashboard/research", response_class=HTMLResponse)
 async def research_page(request: Request):
     return request.app.state.templates.TemplateResponse(
-        "research.html", {"request": request, "active_nav": "research"}
+        request=request, name="research.html", context={"active_nav": "research"}
     )
 
 
 @router.get("/dashboard/ops", response_class=HTMLResponse)
 async def ops_page(request: Request):
     return request.app.state.templates.TemplateResponse(
-        "ops.html", {"request": request, "active_nav": "ops"}
+        request=request, name="ops.html", context={"active_nav": "ops"}
     )
