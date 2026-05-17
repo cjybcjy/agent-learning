@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MGFS 投研系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: block; }
+    .htmx-request.htmx-indicator { display: block; }
+  </style>
+</head>
+<body class="bg-gray-100 h-screen flex overflow-hidden">
+  <aside class="w-64 bg-slate-900 text-white flex flex-col shrink-0">
+    <div class="p-4 text-xl font-bold border-b border-slate-700">MGFS 投研系统</div>
+    <nav class="flex-1 p-4 space-y-2">
+      <a href="/dashboard/research"
+         class="flex items-center gap-2 px-3 py-2 rounded hover:bg-slate-800 {% if active_nav == 'research' %}bg-slate-800{% endif %}">
+        <i data-lucide="line-chart" class="w-4 h-4"></i> 投研视图
+      </a>
+      <a href="/dashboard/ops"
+         class="flex items-center gap-2 px-3 py-2 rounded hover:bg-slate-800 {% if active_nav == 'ops' %}bg-slate-800{% endif %}">
+        <i data-lucide="settings" class="w-4 h-4"></i> 运维视图
+      </a>
+    </nav>
+    <div class="p-4 text-xs text-slate-400 border-t border-slate-700">
+      版本: v1.0 | 分支: company_value_analysis
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-auto p-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    lucide.createIcons();
+    // HTMX 轮询辅助: 当进度完成时自动加载结果
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+      if (evt.detail.target.id === 'scan-progress-text') {
+        const text = evt.detail.target.textContent;
+        if (text.includes('完成') || text.includes('completed')) {
+          const taskId = document.getElementById('scan-task-id')?.dataset?.taskId;
+          if (taskId) {
+            htmx.ajax('GET', '/api/scan/result/' + taskId, '#scan-result');
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
