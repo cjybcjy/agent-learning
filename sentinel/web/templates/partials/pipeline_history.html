@@ -1,0 +1,25 @@
+<div class="flex justify-between items-center mb-4">
+  <button hx-post="/api/pipeline/trigger"
+          hx-target="#pipeline-status"
+          class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center gap-1">
+    <i data-lucide="play" class="w-4 h-4"></i> 立即执行大盘巡检
+  </button>
+  <div id="pipeline-status"></div>
+</div>
+
+<table class="w-full text-sm">
+  <thead>
+    <tr class="bg-gray-100 text-left">
+      <th class="p-2">批次 ID</th>
+      <th class="p-2">时间</th>
+      <th class="p-2">标的数</th>
+      <th class="p-2">Strong Buy</th>
+      <th class="p-2">操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="p-2 text-gray-400" colspan="5">暂无历史记录 (SQLite 表结构待升级)</td>
+    </tr>
+  </tbody>
+</table>

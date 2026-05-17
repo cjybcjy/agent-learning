@@ -6,6 +6,7 @@ from sentinel.web.services.config_service import (
     save_config,
     validate_config,
 )
+from sentinel.web.services.pipeline_service import export_csv, get_history, trigger_pipeline
 
 router = APIRouter()
 
@@ -48,4 +49,28 @@ async def config_save(request: Request, filename: str, content: str):
             "is_valid": success,
             "message": message,
         }
+    )
+
+
+@router.get("/pipeline/history", response_class=HTMLResponse)
+async def pipeline_history(request: Request):
+    return request.app.state.templates.get_template("partials/pipeline_history.html").render(
+        {"request": request}
+    )
+
+
+@router.post("/pipeline/trigger")
+async def pipeline_trigger():
+    result = trigger_pipeline()
+    return result
+
+
+@router.get("/pipeline/export/{batch_id}")
+async def pipeline_export(batch_id: str):
+    csv_data = export_csv(batch_id)
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(
+        csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={batch_id}.csv"},
     )

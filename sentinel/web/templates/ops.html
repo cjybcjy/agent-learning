@@ -30,7 +30,12 @@
   <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
     <i data-lucide="activity" class="w-5 h-5"></i> 实盘流水线
   </h2>
-  <div class="text-gray-400 text-sm">实盘流水线将在后续任务中实现。</div>
+  <div hx-get="/api/pipeline/history"
+       hx-trigger="load"
+       hx-swap="innerHTML"
+  >
+    <div class="text-gray-400 text-sm">加载中...</div>
+  </div>
 </section>
 
 {% endblock %}
