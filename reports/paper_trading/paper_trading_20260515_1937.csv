@@ -1,0 +1,14 @@
+﻿symbol,name,sector,rating,action,final_score,alert_level
+600519,贵州茅台,白酒,Avoid,回避,55.7,green_pass
+000858,五粮液,白酒,Avoid,回避,41.58,green_pass
+000568,泸州老窖,白酒,Avoid,回避,52.48,soft_veto
+000596,古井贡酒,白酒,Avoid,回避,48.02,soft_veto
+002304,洋河股份,白酒,Avoid,回避,16.92,soft_veto
+000333,美的集团,家用电器,Avoid,回避,36.54,soft_veto
+000651,格力电器,家用电器,Avoid,回避,44.96,soft_veto
+002475,立讯精密,电子,Avoid,回避,32.1,soft_veto
+002371,北方华创,半导体,Avoid,回避,37.96,soft_veto
+603501,韦尔股份,半导体,Avoid,回避,53.56,soft_veto
+300760,迈瑞医疗,医疗器械,Avoid,回避,53.71,green_pass
+601899,紫金矿业,有色金属,Avoid,回避,25.42,soft_veto
+000001,平安银行,银行,Avoid,回避,52.15,soft_veto

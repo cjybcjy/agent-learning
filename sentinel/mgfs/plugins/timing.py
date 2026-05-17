@@ -41,41 +41,85 @@ class TimingFactorPlugin(BaseFactorPlugin):
         self._router = ArchetypeRouter(config_path)
         self._fetcher = fetcher if fetcher is not None else MockPriceFetcher()
 
+    def _detect_price_freeze(self, ohlcv: list[OHLCV]) -> tuple[bool, str]:
+        """Detect suspended trading or limit-up/limit-down price freeze.
+
+        Returns (is_frozen, warning_message).
+        """
+        if len(ohlcv) < 5:
+            return False, ""
+
+        recent = ohlcv[-5:]
+        freeze_count = 0
+        for bar in recent:
+            if bar.high == bar.low or bar.volume == 0:
+                freeze_count += 1
+
+        if freeze_count >= 3:
+            return True, (
+                f"检测到连续 {freeze_count} 个交易日价格冻结/停牌，"
+                f"择时信号失效，退回中性分"
+            )
+        return False, ""
+
     def evaluate(self, target: TargetInfo) -> FactorScore:
         # 1. Fetch price history
         ohlcv = self._fetcher.fetch_ohlcv(target.symbol, target.market, days=120)
-        if len(ohlcv) < 80:
+
+        # 1.5 Insufficient data guard (< 60 trading days)
+        if len(ohlcv) < 60:
+            return FactorScore(
+                factor_key=self.factor_key,
+                factor_name=self.factor_name,
+                score=50.0,
+                weight=self.default_weight,
+                confidence=0.0,
+                warnings=[f"K线数据不足 ({len(ohlcv)} 根)，无法计算 60 日均线"],
+            )
+
+        closes = [bar.close for bar in ohlcv]
+        latest_close = closes[-1]
+
+        # 2. Compute MA60 and bias
+        ma60 = sum(closes[-60:]) / 60
+        bias = (latest_close - ma60) / ma60 if ma60 > 0 else 0.0
+
+        # 3. Detect price freeze (suspended / limit-up-down)
+        is_frozen, freeze_msg = self._detect_price_freeze(ohlcv)
+        if is_frozen:
             return FactorScore(
                 factor_key=self.factor_key,
                 factor_name=self.factor_name,
                 score=50.0,
                 weight=self.default_weight,
                 confidence=0.3,
-                warnings=[f"K线数据不足 ({len(ohlcv)} 根)，无法计算 60 日均线"],
+                warnings=[freeze_msg],
             )
 
-        closes = [bar.close for bar in ohlcv]
+        # 4. Compute 60-day MA trend slope (20-day delta)
+        if len(closes) >= 80:
+            ma60_20d_ago = sum(closes[-80:-20]) / 60
+            trend_slope = (
+                (ma60 - ma60_20d_ago) / ma60_20d_ago if ma60_20d_ago > 0 else 0.0
+            )
+        else:
+            # 60-79 days: use first half vs second half for slope estimate
+            split = len(closes) // 2
+            early_closes = closes[:split] if split > 0 else closes[:1]
+            ma60_early = sum(early_closes) / len(early_closes)
+            trend_slope = (
+                (ma60 - ma60_early) / ma60_early if ma60_early > 0 else 0.0
+            )
 
-        # 2. Compute MA60 and bias
-        ma60 = sum(closes[-60:]) / 60
-        latest_close = closes[-1]
-        bias = (latest_close - ma60) / ma60 if ma60 > 0 else 0.0
-
-        # 3. Compute 60-day MA trend slope (20-day delta)
-        ma60_20d_ago = sum(closes[-80:-20]) / 60
-        trend_slope = (
-            (ma60 - ma60_20d_ago) / ma60_20d_ago if ma60_20d_ago > 0 else 0.0
-        )
-
-        # 4. Compute ATR(14) and volatility coefficient
+        # 5. Compute ATR(14) and volatility coefficient
         atr = self._compute_atr(ohlcv, period=14)
         atr_ratio = atr / latest_close if latest_close > 0 else 0.0
 
-        # 5. Resolve archetype for timing parameters
+        # 6. Resolve archetype for timing parameters
         archetype = self._router.resolve_archetype(target.symbol, target.sector)
         timing_cfg = archetype.get("timing", {}) if archetype else {}
 
-        # 6. Score
+        # 7. Score
         score, warnings = self._score_bias(
             bias=bias,
             trend_slope=trend_slope,
@@ -83,14 +127,16 @@ class TimingFactorPlugin(BaseFactorPlugin):
             timing_cfg=timing_cfg,
         )
 
-        # 7. Confidence
+        # 8. Confidence
         data_quality = len(ohlcv)
         if data_quality >= 500:
             confidence = 0.85
         elif data_quality >= 250:
             confidence = 0.75
-        else:
+        elif data_quality >= 80:
             confidence = 0.65
+        else:
+            confidence = 0.3  # 60-79 days: MA60 ok, slope less reliable
 
         details: dict[str, Any] = {
             "ma60": round(ma60, 2),

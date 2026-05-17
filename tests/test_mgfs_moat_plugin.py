@@ -37,11 +37,12 @@ companies:
     score = plugin.evaluate(target)
 
     # Base score = (95 + 90 + 88 + 60 + 70) / 5 = 80.6
+    # With no aggregator, weights are renormalized: base gets 100% weight
     assert score.factor_key == "moat"
     assert score.factor_name == "护城河深度"
     assert score.details["base_score"] == 80.6
     assert score.details["base_weight"] == 0.4
-    assert score.score == 32.24
+    assert score.score == 80.6
 
 
 def test_moat_plugin_missing_company_returns_zero_with_warning(settings):
@@ -136,8 +137,8 @@ companies:
     )
     score = plugin.evaluate(target)
 
-    # base=80, trend=0, safety=0 → 80*0.4 + 0 + 0 = 32
-    assert score.score == 32.0
+    # base=80, trend=0, safety=0 → weights renormalized to base=100%
+    assert score.score == 80.0
     assert score.details["trend_score"] == 0.0
     assert score.details["safety_score"] == 0.0
     assert score.confidence == 0.5  # lowered because dynamic data missing
@@ -179,8 +180,9 @@ companies:
     score = plugin.evaluate(target)
 
     # base=80, trend=0, safety=70
-    # score = 80*0.4 + 0*0.35 + 70*0.25 = 32 + 0 + 17.5 = 49.5
-    assert score.score == 49.5
+    # Weights renormalized: base=0.4/0.65=61.5%, safety=0.25/0.65=38.5%
+    # score = 80*0.615 + 70*0.385 = 76.15
+    assert score.score == 76.15
     assert score.details["base_score"] == 80.0
     assert score.details["trend_score"] == 0.0
     assert score.details["safety_score"] == 70.0

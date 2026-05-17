@@ -1,0 +1,14 @@
+﻿symbol,name,sector,rating,action,final_score,alert_level
+600519,贵州茅台,白酒,Accumulate,分批建仓,85.92,green_pass
+000858,五粮液,白酒,Hold/Watch,等待拐点,69.7,green_pass
+000568,泸州老窖,白酒,Accumulate,分批建仓,79.63,green_pass
+000596,古井贡酒,白酒,Hold/Watch,等待拐点,73.38,green_pass
+002304,洋河股份,白酒,Avoid,一票否决：禁止买入,41.52,hard_veto
+000333,美的集团,家用电器,Hold/Watch,等待拐点,63.39,green_pass
+000651,格力电器,家用电器,Hold/Watch,等待拐点,71.13,green_pass
+002475,立讯精密,电子,Avoid,回避,58.95,green_pass
+002371,北方华创,半导体,Hold/Watch,等待拐点,63.46,green_pass
+603501,韦尔股份,半导体,Accumulate,分批建仓,79.21,green_pass
+300760,迈瑞医疗,医疗器械,Accumulate,分批建仓,81.83,green_pass
+601899,紫金矿业,有色金属,Avoid,回避,46.42,soft_veto
+000001,平安银行,银行,Accumulate,分批建仓,75.4,green_pass

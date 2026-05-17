@@ -106,12 +106,24 @@ class MoatFactorPlugin(BaseFactorPlugin):
         # 3. Safety score (from aggregator)
         safety_score, safety_confidence = self._compute_safety_score(target)
 
-        # 4. Weighted aggregation
+        # 4. Weighted aggregation with dynamic weight renormalization
+        # When dynamic segments lack data, their weight is redistributed to base
+        # to avoid penalizing the score for unavailable data.
         base_w = weights.get("base", {}).get("weight", self.DEFAULT_BASE_WEIGHT)
         trend_w = weights.get("trend", {}).get("weight", self.DEFAULT_TREND_WEIGHT)
         safety_w = weights.get("safety", {}).get("weight", self.DEFAULT_SAFETY_WEIGHT)
 
-        final_score = base_score * base_w + trend_score * trend_w + safety_score * safety_w
+        has_trend = trend_confidence > 0.0
+        has_safety = safety_confidence > 0.0
+
+        active_weight = base_w + (trend_w if has_trend else 0.0) + (safety_w if has_safety else 0.0)
+        if active_weight > 0.0:
+            base_w_eff = base_w / active_weight
+            trend_w_eff = (trend_w / active_weight) if has_trend else 0.0
+            safety_w_eff = (safety_w / active_weight) if has_safety else 0.0
+            final_score = base_score * base_w_eff + trend_score * trend_w_eff + safety_score * safety_w_eff
+        else:
+            final_score = 0.0
 
         # Confidence calculation:
         # - If aggregator is None: fallback confidence
