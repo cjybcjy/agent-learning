@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse
 
 from sentinel.web.services.eval_service import evaluate_single
 from sentinel.web.services.scan_service import (
-    ScanTaskStatus,
     create_task,
     get_task,
     run_scan_task,
