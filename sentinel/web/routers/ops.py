@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from sentinel.web.services.config_service import (
     load_config,
@@ -68,7 +68,6 @@ async def pipeline_trigger():
 @router.get("/pipeline/export/{batch_id}")
 async def pipeline_export(batch_id: str):
     csv_data = export_csv(batch_id)
-    from fastapi.responses import PlainTextResponse
     return PlainTextResponse(
         csv_data,
         media_type="text/csv",
