@@ -1,0 +1,13 @@
+<div id="scan-task-id" data-task-id="{{ task_id }}" class="hidden">{{ task_id }}</div>
+<script>
+  (function() {
+    var taskId = "{{ task_id }}";
+    var progressDiv = document.getElementById('scan-progress');
+    progressDiv.classList.remove('hidden');
+    progressDiv.setAttribute('hx-get', '/api/scan/progress/' + taskId);
+    progressDiv.setAttribute('hx-trigger', 'every 2s');
+    progressDiv.setAttribute('hx-target', '#scan-progress-text');
+    progressDiv.setAttribute('hx-swap', 'innerHTML');
+    htmx.process(progressDiv);
+  })();
+</script>

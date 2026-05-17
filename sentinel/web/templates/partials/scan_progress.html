@@ -1,0 +1,9 @@
+{% if status == "pending" %}
+  准备中...
+{% elif status == "running" %}
+  评估中: {{ completed }} / {{ total }}
+{% elif status == "completed" %}
+  ✅ 扫描完成: {{ completed }} 只标的通过筛选
+{% elif status == "failed" %}
+  ❌ 扫描失败: {{ error }}
+{% endif %}

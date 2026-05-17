@@ -36,8 +36,39 @@
   <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
     <i data-lucide="radar" class="w-5 h-5"></i> 生态雷达
   </h2>
-  <!-- Placeholder for ecosystem scanner (Task 4) -->
-  <div class="text-gray-500 text-sm">生态雷达舱将在后续任务中实现。</div>
+  <form hx-post="/api/scan/start"
+        hx-target="#scan-started"
+        hx-swap="innerHTML">
+    <div class="flex flex-wrap gap-3">
+      <select name="theme" required class="border rounded px-3 py-2 w-64">
+        <option value="">选择宏观主题...</option>
+        <option value="AI_Compute_Infrastructure">AI 算力基建</option>
+        <option value="New_Energy_Materials">新能源材料</option>
+        <option value="Consumer_Staples">消费必需品</option>
+        <option value="Financial_Services">金融服务</option>
+        <option value="Advanced_Manufacturing">先进制造</option>
+      </select>
+      <input name="roles" placeholder="角色过滤 (逗号分隔)"
+             class="border rounded px-3 py-2 w-56">
+      <button type="submit"
+              class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        启动扫描
+      </button>
+    </div>
+  </form>
+
+  <div id="scan-started"></div>
+
+  <div id="scan-progress" class="mt-4 hidden">
+    <div class="flex items-center gap-3">
+      <div class="w-48 bg-gray-200 rounded-full h-2">
+        <div id="scan-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+      </div>
+      <span id="scan-progress-text" class="text-sm text-gray-600"></span>
+    </div>
+  </div>
+
+  <div id="scan-result" class="mt-4"></div>
 </section>
 
 {% endblock %}
