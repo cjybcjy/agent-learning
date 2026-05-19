@@ -108,3 +108,80 @@ def test_repository_save_without_sector(settings):
     decisions = repo.get_decisions_for_symbol("000001", Market.A_SHARE)
     assert len(decisions) == 1
     assert decisions[0]["sector"] is None
+
+
+def test_active_holdings_crud(settings):
+    db = Database(settings.database_path)
+    repo = MGFSRepository(db)
+    repo.bootstrap()
+
+    repo.save_active_holding(
+        symbol="600519",
+        name="贵州茅台",
+        sector="白酒",
+        entry_price=1500.0,
+        current_price=1500.0,
+        highest_price=1500.0,
+        weight=0.20,
+        stop_loss_hard=-0.20,
+        stop_loss_trailing=-0.15,
+        portfolio_stop_loss=-0.10,
+    )
+
+    holdings = repo.list_active_holdings()
+    assert len(holdings) == 1
+    assert holdings[0]["symbol"] == "600519"
+    assert holdings[0]["highest_price"] == 1500.0
+
+
+def test_active_holdings_update_price_and_highest(settings):
+    db = Database(settings.database_path)
+    repo = MGFSRepository(db)
+    repo.bootstrap()
+
+    repo.save_active_holding(
+        symbol="600519",
+        name="贵州茅台",
+        sector="白酒",
+        entry_price=1500.0,
+        current_price=1500.0,
+        highest_price=1500.0,
+        weight=0.20,
+        stop_loss_hard=-0.20,
+        stop_loss_trailing=-0.15,
+        portfolio_stop_loss=-0.10,
+    )
+
+    # Price rises → highest_price updates
+    repo.update_holding_price("600519", 1600.0)
+    holdings = repo.list_active_holdings()
+    assert holdings[0]["current_price"] == 1600.0
+    assert holdings[0]["highest_price"] == 1600.0
+
+    # Price falls → highest_price stays at peak
+    repo.update_holding_price("600519", 1550.0)
+    holdings = repo.list_active_holdings()
+    assert holdings[0]["current_price"] == 1550.0
+    assert holdings[0]["highest_price"] == 1600.0
+
+
+def test_active_holdings_delete(settings):
+    db = Database(settings.database_path)
+    repo = MGFSRepository(db)
+    repo.bootstrap()
+
+    repo.save_active_holding(
+        symbol="600519",
+        name="贵州茅台",
+        sector="白酒",
+        entry_price=1500.0,
+        current_price=1500.0,
+        highest_price=1500.0,
+        weight=0.20,
+        stop_loss_hard=-0.20,
+        stop_loss_trailing=-0.15,
+        portfolio_stop_loss=-0.10,
+    )
+
+    repo.delete_active_holding("600519")
+    assert repo.list_active_holdings() == []

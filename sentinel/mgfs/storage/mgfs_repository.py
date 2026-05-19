@@ -51,6 +51,20 @@ CREATE TABLE IF NOT EXISTS mgfs_pipeline_results (
     PRIMARY KEY (batch_id, symbol),
     FOREIGN KEY (batch_id) REFERENCES mgfs_pipeline_batches(batch_id)
 );
+
+CREATE TABLE IF NOT EXISTS mgfs_active_holdings (
+    symbol VARCHAR(16) PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,
+    sector VARCHAR(50),
+    entry_price DOUBLE NOT NULL,
+    current_price DOUBLE NOT NULL,
+    highest_price DOUBLE NOT NULL,
+    weight DOUBLE NOT NULL,
+    entry_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    stop_loss_hard DOUBLE NOT NULL,
+    stop_loss_trailing DOUBLE NOT NULL,
+    portfolio_stop_loss DOUBLE NOT NULL
+);
 """
 
 
@@ -255,6 +269,94 @@ class MGFSRepository:
             ).fetchall()
             columns = [desc[0] for desc in con.description]
             return [dict(zip(columns, row)) for row in rows]
+        finally:
+            con.close()
+
+    # ------------------------------------------------------------------
+    # Active holdings (position tracking for stop-loss)
+    # ------------------------------------------------------------------
+
+    def save_active_holding(
+        self,
+        symbol: str,
+        name: str,
+        sector: str | None,
+        entry_price: float,
+        current_price: float,
+        highest_price: float,
+        weight: float,
+        stop_loss_hard: float,
+        stop_loss_trailing: float,
+        portfolio_stop_loss: float,
+    ) -> None:
+        con = self.database.connect()
+        try:
+            con.execute(
+                """
+                INSERT INTO mgfs_active_holdings
+                (symbol, name, sector, entry_price, current_price, highest_price,
+                 weight, stop_loss_hard, stop_loss_trailing, portfolio_stop_loss)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (symbol) DO UPDATE SET
+                    name = excluded.name,
+                    sector = excluded.sector,
+                    current_price = excluded.current_price,
+                    highest_price = CASE
+                        WHEN mgfs_active_holdings.highest_price > excluded.highest_price
+                        THEN mgfs_active_holdings.highest_price
+                        ELSE excluded.highest_price
+                    END,
+                    weight = excluded.weight,
+                    stop_loss_hard = excluded.stop_loss_hard,
+                    stop_loss_trailing = excluded.stop_loss_trailing,
+                    portfolio_stop_loss = excluded.portfolio_stop_loss
+                """,
+                [
+                    symbol, name, sector, entry_price, current_price,
+                    highest_price, weight, stop_loss_hard,
+                    stop_loss_trailing, portfolio_stop_loss,
+                ],
+            )
+        finally:
+            con.close()
+
+    def update_holding_price(self, symbol: str, current_price: float) -> None:
+        """Update current_price and highest_price = MAX(highest_price, current_price)."""
+        con = self.database.connect()
+        try:
+            con.execute(
+                """
+                UPDATE mgfs_active_holdings
+                SET current_price = ?,
+                    highest_price = CASE
+                        WHEN highest_price > ? THEN highest_price
+                        ELSE ?
+                    END
+                WHERE symbol = ?
+                """,
+                [current_price, current_price, current_price, symbol],
+            )
+        finally:
+            con.close()
+
+    def list_active_holdings(self) -> list[dict[str, Any]]:
+        con = self.database.connect()
+        try:
+            rows = con.execute(
+                "SELECT * FROM mgfs_active_holdings ORDER BY entry_date DESC"
+            ).fetchall()
+            columns = [desc[0] for desc in con.description]
+            return [dict(zip(columns, row)) for row in rows]
+        finally:
+            con.close()
+
+    def delete_active_holding(self, symbol: str) -> None:
+        con = self.database.connect()
+        try:
+            con.execute(
+                "DELETE FROM mgfs_active_holdings WHERE symbol = ?",
+                [symbol],
+            )
         finally:
             con.close()
 
