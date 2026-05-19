@@ -15,11 +15,6 @@
      style="border-color: {% if color == 'red' %}#ef4444{% elif color == 'orange' %}#f97316{% elif color == 'yellow' %}#eab308{% else %}#22c55e{% endif %}">
   <div class="flex justify-between items-center mb-3">
     <h3 class="text-xl font-bold">{{ emoji }} {{ decision.target.symbol }} — {{ decision.rating }}</h3>
-    <button hx-post="/api/eval/share-lark"
-            hx-vals='{"symbol": "{{ decision.target.symbol }}", "market": "{{ decision.target.market.value }}"}'
-            class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">
-      一键同步飞书群
-    </button>
   </div>
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
@@ -51,4 +46,33 @@
   {% if decision.report_sections.get("watermark") %}
   <div class="mt-2 text-yellow-700 text-sm">⚠️ {{ decision.report_sections["watermark"] }}</div>
   {% endif %}
+
+  {% if moat_radar_data %}
+  <hr class="my-3">
+  <div class="text-sm font-medium mb-2">护城河五维雷达</div>
+  <div
+    id="moat-radar-chart"
+    class="w-full"
+    style="height: 280px;"
+    data-moat-dims='{{ moat_radar_data | tojson }}'
+  ></div>
+  {% endif %}
+
+  {% if valuation_band_data %}
+  <hr class="my-3">
+  <div class="text-sm font-medium mb-2">
+    {{ valuation_band_data.metric_label }} 历史走势
+    <span class="text-xs text-gray-400 ml-1">(10%分位: {{ valuation_band_data.p10 }} / 中位: {{ valuation_band_data.p50 }} / 90%分位: {{ valuation_band_data.p90 }})</span>
+  </div>
+  <div
+    id="valuation-band-chart"
+    class="w-full"
+    style="height: 280px;"
+    data-val-band='{{ valuation_band_data | tojson }}'
+  ></div>
+  {% endif %}
+
+  <script>
+    document.body.dispatchEvent(new Event('render-echarts'));
+  </script>
 </div>

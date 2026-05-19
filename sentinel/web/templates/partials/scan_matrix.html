@@ -1,4 +1,29 @@
 {% if reports %}
+{# Serialize reports into ECharts-compatible scatter data #}
+{% set scatter_data = [] %}
+{% for r in reports %}
+{% set moat = r.factor_scores.get("moat") %}
+{% set val = r.factor_scores.get("valuation") %}
+{% set _ = scatter_data.append({
+    "symbol": r.target.symbol,
+    "name": r.target.name or r.target.symbol,
+    "moat": (moat.score if moat else 0) | float,
+    "percentile": (val.details.get("primary_percentile", 50) if val and val.details else 50) | float,
+    "score": r.final_score | float,
+    "role": r.target.ecosystem_role or "unknown"
+}) %}
+{% endfor %}
+
+<div id="ecosystem-scatter-chart"
+     class="w-full mb-4"
+     style="height: 400px;"
+     data-scatter-data='{{ scatter_data | tojson }}'>
+</div>
+
+<script>
+  document.body.dispatchEvent(new Event('render-echarts'));
+</script>
+
 <div class="overflow-x-auto">
   <table class="w-full text-sm">
     <thead>

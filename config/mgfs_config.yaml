@@ -15,7 +15,7 @@ modules:
     class_path: "sentinel.mgfs.plugins.valuation.ValuationFactorPlugin"
     config: {}
   timing:
-    enabled: false
+    enabled: true
     class_path: "sentinel.mgfs.plugins.timing.TimingFactorPlugin"
     config: {}
 

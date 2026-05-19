@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from sentinel.web.services.config_service import (
@@ -6,9 +6,17 @@ from sentinel.web.services.config_service import (
     save_config,
     validate_config,
 )
-from sentinel.web.services.pipeline_service import export_csv, get_history, trigger_pipeline
+from sentinel.web.services.pipeline_service import PipelineService
 
 router = APIRouter()
+_pipeline_svc: PipelineService | None = None
+
+
+def _get_pipeline_service() -> PipelineService:
+    global _pipeline_svc
+    if _pipeline_svc is None:
+        _pipeline_svc = PipelineService()
+    return _pipeline_svc
 
 
 @router.get("/config/load/{filename}", response_class=HTMLResponse)
@@ -58,20 +66,40 @@ async def config_save(
 
 @router.get("/pipeline/history", response_class=HTMLResponse)
 async def pipeline_history(request: Request):
+    svc = _get_pipeline_service()
+    batches = svc.get_history(limit=50)
     return request.app.state.templates.get_template("partials/pipeline_history.html").render(
-        {"request": request}
+        {"request": request, "batches": batches}
     )
 
 
-@router.post("/pipeline/trigger")
-async def pipeline_trigger():
-    result = trigger_pipeline()
-    return result
+@router.post("/pipeline/trigger", response_class=HTMLResponse)
+async def pipeline_trigger(request: Request, background_tasks: BackgroundTasks):
+    svc = _get_pipeline_service()
+    batch_id = svc.create_batch()
+    background_tasks.add_task(svc.run_pipeline, batch_id)
+    return request.app.state.templates.get_template("partials/pipeline_history.html").render(
+        {
+            "request": request,
+            "batches": svc.get_history(limit=50),
+            "message": f"批次 {batch_id} 已启动，后台扫描中...",
+        }
+    )
+
+
+@router.get("/pipeline/detail/{batch_id}", response_class=HTMLResponse)
+async def pipeline_detail(request: Request, batch_id: str):
+    svc = _get_pipeline_service()
+    results = svc.get_pipeline_results(batch_id)
+    return request.app.state.templates.get_template("partials/pipeline_detail_table.html").render(
+        {"request": request, "results": results, "batch_id": batch_id}
+    )
 
 
 @router.get("/pipeline/export/{batch_id}")
 async def pipeline_export(batch_id: str):
-    csv_data = export_csv(batch_id)
+    svc = _get_pipeline_service()
+    csv_data = svc.export_csv(batch_id)
     return PlainTextResponse(
         csv_data,
         media_type="text/csv",

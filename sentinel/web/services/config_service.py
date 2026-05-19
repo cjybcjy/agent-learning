@@ -82,10 +82,14 @@ def save_config(filename: str, content: str) -> tuple[bool, str]:
     # Hot reload: rebuild orchestrator
     from sentinel.mgfs.config_loader import build_orchestrator, load_mgfs_config
     from sentinel.web.dependencies import get_orchestrator
+    from sentinel.mgfs.data import get_price_fetcher
     from sentinel.mgfs.data.eastmoney_fetcher import EastmoneyValuationFetcher
 
     mgfs_config = load_mgfs_config(CONFIG_DIR / "mgfs_config.yaml")
-    fetchers = {"valuation": EastmoneyValuationFetcher()}
+    fetchers = {
+        "valuation": EastmoneyValuationFetcher(),
+        "timing": get_price_fetcher(),
+    }
     new_orch = build_orchestrator(mgfs_config, config_dir=CONFIG_DIR, fetchers=fetchers)
 
     # Replace global orchestrator

@@ -224,5 +224,5 @@ override_archetypes: {}
 
     assert result.exit_code == 0
     assert "投资权衡与决策说明书" in result.stdout
-    # 冷门股无历史数据，估值 confidence 低，水印应提示数据缺失
-    assert "[数据" in result.stdout or "[数据残缺" in result.stdout or "[数据部分缺失" in result.stdout
+    # 冷门股无历史数据，估值插件获取失败触发系统故障保护
+    assert "系统故障" in result.stdout or "[数据" in result.stdout

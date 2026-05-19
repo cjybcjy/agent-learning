@@ -1,25 +1,73 @@
 <div class="flex justify-between items-center mb-4">
   <button hx-post="/api/pipeline/trigger"
-          hx-target="#pipeline-status"
+          hx-target="#pipeline-container"
           class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center gap-1">
     <i data-lucide="play" class="w-4 h-4"></i> 立即执行大盘巡检
   </button>
-  <div id="pipeline-status"></div>
+  {% if message %}
+  <div class="text-green-600 text-sm">{{ message }}</div>
+  {% endif %}
 </div>
 
-<table class="w-full text-sm">
-  <thead>
-    <tr class="bg-gray-100 text-left">
-      <th class="p-2">批次 ID</th>
-      <th class="p-2">时间</th>
-      <th class="p-2">标的数</th>
-      <th class="p-2">Strong Buy</th>
-      <th class="p-2">操作</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td class="p-2 text-gray-400" colspan="5">暂无历史记录 (SQLite 表结构待升级)</td>
-    </tr>
-  </tbody>
-</table>
+<div id="pipeline-container">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="bg-gray-100 text-left">
+        <th class="p-2">批次 ID</th>
+        <th class="p-2">时间</th>
+        <th class="p-2">状态</th>
+        <th class="p-2">标的数</th>
+        <th class="p-2">Strong Buy</th>
+        <th class="p-2">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if batches %}
+        {% for batch in batches %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-2 font-mono text-xs">
+            <button hx-get="/api/pipeline/detail/{{ batch.batch_id }}"
+                    hx-target="#detail-row-{{ batch.batch_id }}"
+                    hx-swap="innerHTML"
+                    class="text-blue-600 hover:underline font-bold bg-transparent border-none cursor-pointer p-0">
+              {{ batch.batch_id }}
+            </button>
+          </td>
+          <td class="p-2">{{ batch.triggered_at }}</td>
+          <td class="p-2">
+            {% if batch.status == 'running' %}
+              <span class="text-yellow-600 font-medium">运行中</span>
+            {% elif batch.status == 'completed' %}
+              <span class="text-green-600 font-medium">已完成</span>
+            {% elif batch.status == 'failed' %}
+              <span class="text-red-600 font-medium">失败</span>
+            {% else %}
+              <span class="text-gray-500">{{ batch.status }}</span>
+            {% endif %}
+          </td>
+          <td class="p-2">{{ batch.total_count }}</td>
+          <td class="p-2 font-bold text-green-700">{{ batch.strong_buy_count }}</td>
+          <td class="p-2">
+            {% if batch.status == 'completed' %}
+            <a href="/api/pipeline/export/{{ batch.batch_id }}"
+               download="MGFS_Report_{{ batch.batch_id }}.csv"
+               class="text-blue-600 hover:underline text-xs">
+              导出 CSV
+            </a>
+            {% elif batch.status == 'failed' and batch.error_log %}
+            <span class="text-red-500 text-xs" title="{{ batch.error_log }}">查看错误</span>
+            {% else %}
+            <span class="text-gray-300 text-xs">-</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr id="detail-row-{{ batch.batch_id }}"></tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td class="p-2 text-gray-400" colspan="6">暂无历史记录，点击上方按钮执行首次大盘巡检</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>

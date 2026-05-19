@@ -16,7 +16,6 @@ def run(
     market: Market = typer.Option(..., "--market"),
     report: str | None = typer.Option(None, "--report"),
     time: str | None = typer.Option(None, "--time"),
-    publish: bool = typer.Option(False, "--publish", help="Push results to Feishu Bitable + Doc"),
     collectors: str | None = typer.Option(None, "--collectors", help="Comma-separated collector keys (overrides markets.yaml)"),
 ) -> None:
     del report, time
@@ -30,17 +29,6 @@ def run(
         delta = f"Δ{s.change_pct:+.1f}%" if s.change_pct is not None else "NEW"
         typer.echo(f"  {s.symbol}: heat={s.directed_heat:.2f} ({direction}) [{delta}]")
 
-    if publish:
-        from sentinel.publishers.lark_bitable import LarkBitablePublisher
-        from sentinel.publishers.lark_doc import LarkDocPublisher
-
-        config_dir = settings.resolved_config_dir
-        bitable_pub = LarkBitablePublisher(config_dir)
-        doc_pub = LarkDocPublisher(config_dir)
-        bitable_pub.publish(market, snapshots)
-        doc_pub.publish(market, snapshots)
-        typer.echo(f"published to Feishu for {market.value}")
-
 
 @app.command()
 def evaluate(
@@ -49,11 +37,11 @@ def evaluate(
     asset_class: str = typer.Option("equity", "--asset-class"),
     policy: str = typer.Option("neutral", "--policy", help="政策评级"),
     sector: str | None = typer.Option(None, "--sector"),
-    publish: bool = typer.Option(False, "--publish"),
 ) -> None:
     from sentinel.mgfs.config_loader import load_mgfs_config, build_orchestrator
     from sentinel.mgfs.factor_plugin import TargetInfo
     from sentinel.mgfs.data.eastmoney_fetcher import EastmoneyValuationFetcher
+    from sentinel.mgfs.data import get_price_fetcher
 
     settings = AppSettings()
     config_path = settings.resolved_config_dir / "mgfs_config.yaml"
@@ -63,7 +51,10 @@ def evaluate(
         typer.echo("错误: 未找到 mgfs_config.yaml，请检查配置目录", err=True)
         raise typer.Exit(1)
 
-    fetchers = {"valuation": EastmoneyValuationFetcher()}
+    fetchers = {
+        "valuation": EastmoneyValuationFetcher(),
+        "timing": get_price_fetcher(),
+    }
     orchestrator = build_orchestrator(
         config, config_dir=settings.resolved_config_dir, fetchers=fetchers
     )
@@ -103,22 +94,17 @@ def evaluate(
             typer.echo(f"  - [{action_label}] {cb['message']}")
     typer.echo(f"{'='*50}\n")
 
-    if publish:
-        typer.echo("已推送至飞书文档")
-
 
 @app.command()
 def scan(
     theme: str = typer.Argument(..., help="宏观主题名称 (如 AI_Compute_Infrastructure)"),
     roles: str | None = typer.Option(None, "--roles", help="逗号分隔的生态角色过滤 (如 symbiotic_infra,upstream_resource)"),
     policy: str = typer.Option("neutral", "--policy", help="政策评级"),
-    publish: bool = typer.Option(False, "--publish", help="推送至飞书"),
 ) -> None:
     """扫描指定产业链主题，筛选高护城河+低估值的价值标的。"""
     from sentinel.mgfs.config_loader import load_mgfs_config, build_orchestrator
     from sentinel.mgfs.scanner import EcosystemScanner
-    from sentinel.mgfs.data.eastmoney_fetcher import EastmoneyValuationFetcher
-    from sentinel.publishers.mgfs_report import build_ecosystem_scan_report
+    from sentinel.mgfs.data import get_price_fetcher
 
     settings = AppSettings()
     config_dir = settings.resolved_config_dir
@@ -130,7 +116,10 @@ def scan(
         typer.echo("错误: 未找到 mgfs_config.yaml，请检查配置目录", err=True)
         raise typer.Exit(1)
 
-    fetchers = {"valuation": EastmoneyValuationFetcher()}
+    fetchers = {
+        "valuation": EastmoneyValuationFetcher(),
+        "timing": get_price_fetcher(),
+    }
     orchestrator = build_orchestrator(
         config, config_dir=config_dir, fetchers=fetchers
     )
@@ -181,10 +170,6 @@ def scan(
     if skipped_roles:
         typer.echo(f"  {skipped_roles} 只标的因角色过滤被跳过")
     typer.echo("=" * 60)
-
-    if publish:
-        report = build_ecosystem_scan_report(result)
-        typer.echo(json.dumps(report, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

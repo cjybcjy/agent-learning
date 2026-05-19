@@ -84,14 +84,33 @@ class MGFSOrchestrator:
         triggered, alert_level = self._check_circuit_breakers(
             factor_scores, policy_rating
         )
-        rating, action = self._classify_rating(final_score, alert_level)
+
+        # Detect system failures (e.g. network outage in timing plugin)
+        system_failure_keys = [
+            key for key, score in factor_scores.items()
+            if score.confidence == 0.0
+            and any("系统故障" in w for w in score.warnings)
+        ]
+
         overall_confidence = self._compute_overall_confidence(factor_scores, adjusted_weights)
-        if overall_confidence < 0.5:
-            watermark = "[数据残缺 / 评估挂起]"
-        elif overall_confidence < 0.8:
-            watermark = "[数据部分缺失]"
+
+        if system_failure_keys:
+            # Force downgrade to Hold/Watch with system-failure watermark
+            alert_level = AlertLevel.SOFT_VETO
+            rating = "Hold/Watch"
+            action = "等待拐点"
+            failed_names = [
+                factor_scores[k].factor_name for k in system_failure_keys
+            ]
+            watermark = f"⚠️ {'/'.join(failed_names)}系统故障，置信度熔断保护中"
         else:
-            watermark = ""
+            rating, action = self._classify_rating(final_score, alert_level)
+            if overall_confidence < 0.5:
+                watermark = "[数据残缺 / 评估挂起]"
+            elif overall_confidence < 0.8:
+                watermark = "[数据部分缺失]"
+            else:
+                watermark = ""
 
         return InvestmentDecision(
             target=target,
@@ -136,7 +155,22 @@ class MGFSOrchestrator:
 
         Plugins with confidence < 0.5 have their weight set to 0.
         Remaining weights are re-normalized proportionally.
+
+        Exception: system failures (confidence == 0.0 with system-failure warning)
+        retain their original weight so that a score of 0 drags the total down,
+        preventing inflated ratings when a plugin crashes.
         """
+        # Detect system failures — these must NOT trigger redistribution
+        system_failure_keys = {
+            key for key, score in factor_scores.items()
+            if score.confidence == 0.0
+            and any("系统故障" in w for w in score.warnings)
+        }
+
+        if system_failure_keys:
+            # Keep original weights; failed plugin contributes 0 score naturally
+            return {key: self.scoring_weights.get(key, 0.0) for key in factor_scores}
+
         # Step 1: Mark low-confidence plugins as inactive
         active: dict[str, float] = {}
         for key, score in factor_scores.items():

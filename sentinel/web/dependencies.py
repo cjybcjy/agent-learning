@@ -12,12 +12,16 @@ def get_orchestrator() -> MGFSOrchestrator:
     if _orchestrator is None:
         from sentinel.config import AppSettings
         from sentinel.mgfs.config_loader import build_orchestrator, load_mgfs_config
+        from sentinel.mgfs.data import get_price_fetcher
         from sentinel.mgfs.data.eastmoney_fetcher import EastmoneyValuationFetcher
 
         settings = AppSettings()
         config_path = settings.resolved_config_dir / "mgfs_config.yaml"
         config = load_mgfs_config(config_path)
-        fetchers = {"valuation": EastmoneyValuationFetcher()}
+        fetchers = {
+            "valuation": EastmoneyValuationFetcher(),
+            "timing": get_price_fetcher(),
+        }
         _orchestrator = build_orchestrator(
             config, config_dir=settings.resolved_config_dir, fetchers=fetchers
         )

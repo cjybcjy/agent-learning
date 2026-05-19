@@ -2,6 +2,8 @@ from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse
 
 from sentinel.web.services.eval_service import evaluate_single
+from sentinel.web.services.moat_service import build_moat_radar_data
+from sentinel.web.services.valuation_chart_service import build_valuation_band_data
 from sentinel.web.services.scan_service import (
     create_task,
     get_task,
@@ -9,11 +11,6 @@ from sentinel.web.services.scan_service import (
 )
 
 router = APIRouter()
-
-
-@router.post("/eval/share-lark")
-async def eval_share_lark(symbol: str = Form(...), market: str = Form(...)):
-    return {"status": "ok", "message": f"已同步 {symbol} ({market}) 到飞书群"}
 
 
 @router.post("/eval/single", response_class=HTMLResponse)
@@ -35,8 +32,19 @@ async def eval_single(
             f"<div class='text-red-600 p-4'>评估失败: {str(e)}</div>",
             status_code=500,
         )
+    moat_radar_data = build_moat_radar_data(symbol)
+    valuation_band_data = build_valuation_band_data(
+        symbol=symbol,
+        market=decision.target.market,
+        sector=decision.target.sector,
+    )
     template = request.app.state.templates.get_template("partials/decision_card.html")
-    content = template.render({"request": request, "decision": decision})
+    content = template.render({
+        "request": request,
+        "decision": decision,
+        "moat_radar_data": moat_radar_data,
+        "valuation_band_data": valuation_band_data,
+    })
     return HTMLResponse(content=content)
 
 

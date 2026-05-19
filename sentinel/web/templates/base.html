@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
   <style>
     .htmx-indicator { display: none; }
     .htmx-request .htmx-indicator { display: block; }
@@ -37,6 +38,7 @@
 
   <script>
     lucide.createIcons();
+
     // HTMX 轮询辅助: 当进度完成时自动加载结果
     document.body.addEventListener('htmx:afterSwap', function(evt) {
       if (evt.detail.target.id === 'scan-progress-text') {
@@ -46,6 +48,219 @@
           if (taskId) {
             htmx.ajax('GET', '/api/scan/result/' + taskId, '#scan-result');
           }
+        }
+      }
+    });
+
+    // ECharts 渲染钩子 — 由 decision_card.html 触发
+    document.body.addEventListener('render-echarts', function() {
+      // ---- 1. Moat Radar Chart ----
+      var radarDom = document.getElementById('moat-radar-chart');
+      if (radarDom) {
+        var existingRadar = echarts.getInstanceByDom(radarDom);
+        if (existingRadar) existingRadar.dispose();
+
+        var radarRaw = radarDom.getAttribute('data-moat-dims');
+        if (radarRaw) {
+          var radarData = JSON.parse(radarRaw);
+          var radarChart = echarts.init(radarDom);
+          radarChart.setOption({
+            tooltip: { trigger: 'item' },
+            radar: {
+              indicator: radarData.indicator,
+              radius: '65%',
+              axisName: { color: '#666', fontSize: 12 },
+              splitArea: {
+                areaStyle: {
+                  color: ['#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8'],
+                }
+              }
+            },
+            series: [{
+              type: 'radar',
+              data: [{
+                value: radarData.values,
+                name: '护城河评分',
+                areaStyle: { color: 'rgba(34, 197, 94, 0.3)' },
+                lineStyle: { color: '#22c55e', width: 2 },
+                itemStyle: { color: '#22c55e' },
+              }]
+            }]
+          });
+        }
+      }
+
+      // ---- 2. Valuation Band Chart ----
+      var bandDom = document.getElementById('valuation-band-chart');
+      if (bandDom) {
+        var existingBand = echarts.getInstanceByDom(bandDom);
+        if (existingBand) existingBand.dispose();
+
+        var bandRaw = bandDom.getAttribute('data-val-band');
+        if (bandRaw) {
+          var bandData = JSON.parse(bandRaw);
+          var bandChart = echarts.init(bandDom);
+
+          // Downsample dates for readability if too many points
+          var dates = bandData.dates;
+          var values = bandData.values;
+          var step = Math.max(1, Math.floor(dates.length / 120));
+          var sampledDates = [];
+          var sampledValues = [];
+          for (var i = 0; i < dates.length; i += step) {
+            sampledDates.push(dates[i]);
+            sampledValues.push(values[i]);
+          }
+
+          var p10 = bandData.p10;
+          var p50 = bandData.p50;
+          var p90 = bandData.p90;
+
+          bandChart.setOption({
+            tooltip: {
+              trigger: 'axis',
+              formatter: function(params) {
+                var date = params[0].axisValue;
+                var val = params[0].value;
+                return date + '<br/>' + bandData.metric_label + ': ' + (val >= 0 ? val.toFixed(2) : 'N/A');
+              }
+            },
+            grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+            xAxis: {
+              type: 'category',
+              data: sampledDates,
+              axisLabel: { rotate: 45, fontSize: 10, color: '#999' },
+              axisLine: { lineStyle: { color: '#ddd' } },
+            },
+            yAxis: {
+              type: 'value',
+              name: bandData.metric_label,
+              nameTextStyle: { color: '#666', fontSize: 12 },
+              axisLine: { lineStyle: { color: '#ddd' } },
+              splitLine: { lineStyle: { color: '#f0f0f0' } },
+            },
+            series: [
+              {
+                name: bandData.metric_label,
+                type: 'line',
+                data: sampledValues,
+                smooth: true,
+                symbol: 'none',
+                lineStyle: { color: '#3b82f6', width: 2 },
+                areaStyle: {
+                  color: {
+                    type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                      { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+                      { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                    ]
+                  }
+                },
+                markLine: {
+                  silent: true,
+                  symbol: 'none',
+                  lineStyle: { type: 'dashed', width: 1.5 },
+                  data: [
+                    { yAxis: p10, label: { formatter: '10%分位', position: 'end', color: '#22c55e' }, lineStyle: { color: '#22c55e' } },
+                    { yAxis: p50, label: { formatter: '中位数', position: 'end', color: '#f59e0b' }, lineStyle: { color: '#f59e0b' } },
+                    { yAxis: p90, label: { formatter: '90%分位', position: 'end', color: '#ef4444' }, lineStyle: { color: '#ef4444' } },
+                  ]
+                },
+              }
+            ]
+          });
+        }
+      }
+
+      // ---- 3. Ecosystem Scatter Chart ----
+      var scatterDom = document.getElementById('ecosystem-scatter-chart');
+      if (scatterDom) {
+        var existingScatter = echarts.getInstanceByDom(scatterDom);
+        if (existingScatter) existingScatter.dispose();
+
+        var scatterRaw = scatterDom.getAttribute('data-scatter-data');
+        if (scatterRaw) {
+          var scatterItems = JSON.parse(scatterRaw);
+
+          // Role color mapping
+          var roleColors = {
+            core_arena: '#3b82f6',        // blue
+            symbiotic_infra: '#eab308',   // gold
+            upstream_resource: '#a855f7', // purple
+            downstream_app: '#22c55e',    // green
+            unknown: '#9ca3af',
+          };
+
+          var seriesData = scatterItems.map(function(item) {
+            return {
+              name: item.symbol + ' ' + item.name,
+              value: [
+                item.percentile,   // x: valuation percentile
+                item.moat,         // y: moat score
+                item.score,        // size: final score
+                item.role,         // color key
+              ],
+              itemStyle: {
+                color: roleColors[item.role] || roleColors.unknown,
+              }
+            };
+          });
+
+          var scatterChart = echarts.init(scatterDom);
+          scatterChart.setOption({
+            tooltip: {
+              trigger: 'item',
+              formatter: function(params) {
+                var d = params.data;
+                return d.name + '<br/>'
+                  + '护城河: ' + d.value[1].toFixed(1) + '<br/>'
+                  + '估值百分位: ' + d.value[0].toFixed(1) + '%<br/>'
+                  + '最终得分: ' + d.value[2].toFixed(2);
+              }
+            },
+            grid: { left: '8%', right: '8%', bottom: '8%', top: '10%', containLabel: true },
+            xAxis: {
+              type: 'value',
+              name: '估值百分位 (低→高)',
+              nameLocation: 'middle',
+              nameGap: 25,
+              min: 0, max: 100,
+              splitLine: { lineStyle: { color: '#f0f0f0' } },
+              axisLine: { lineStyle: { color: '#ddd' } },
+            },
+            yAxis: {
+              type: 'value',
+              name: '护城河得分',
+              min: 0, max: 100,
+              splitLine: { lineStyle: { color: '#f0f0f0' } },
+              axisLine: { lineStyle: { color: '#ddd' } },
+            },
+            series: [{
+              type: 'scatter',
+              data: seriesData,
+              symbolSize: function(data) {
+                // Map final score (0-100+) to radius 8-32
+                return Math.max(8, Math.min(32, data[2] / 3));
+              },
+              markArea: {
+                silent: true,
+                itemStyle: { color: 'rgba(34, 197, 94, 0.08)' },
+                data: [[
+                  { name: '黄金重仓区', xAxis: 0, yAxis: 100 },
+                  { xAxis: 40, yAxis: 60 },
+                ]]
+              },
+              markLine: {
+                silent: true,
+                symbol: 'none',
+                lineStyle: { type: 'dashed', width: 1, color: '#ccc' },
+                data: [
+                  { xAxis: 40 },
+                  { yAxis: 60 },
+                ]
+              }
+            }]
+          });
         }
       }
     });
