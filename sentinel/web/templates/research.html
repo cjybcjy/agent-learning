@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 
+<!-- 全局风控警报舱 — HTMX 每 10s 轮询 -->
+<div hx-get="/api/risk/alerts"
+     hx-trigger="load, every 10s"
+     hx-target="this"
+     hx-swap="outerHTML">
+  <div class="mb-6">
+    <div class="bg-gray-100 border border-gray-200 text-gray-400 rounded-lg px-4 py-2 flex items-center gap-2 text-sm">
+      <i data-lucide="shield" class="w-4 h-4"></i>
+      <span>风控状态加载中...</span>
+    </div>
+  </div>
+</div>
+
 <section class="bg-white rounded-lg shadow p-6 mb-6">
   <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
     <i data-lucide="search" class="w-5 h-5"></i> 单票评估

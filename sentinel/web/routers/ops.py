@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
+from sentinel.mgfs.execution.stop_loss_monitor import StopLossMonitor
 from sentinel.web.services.config_service import (
     load_config,
     save_config,
@@ -10,6 +11,7 @@ from sentinel.web.services.pipeline_service import PipelineService
 
 router = APIRouter()
 _pipeline_svc: PipelineService | None = None
+_sl_monitor: StopLossMonitor | None = None
 
 
 def _get_pipeline_service() -> PipelineService:
@@ -17,6 +19,19 @@ def _get_pipeline_service() -> PipelineService:
     if _pipeline_svc is None:
         _pipeline_svc = PipelineService()
     return _pipeline_svc
+
+
+def _get_stop_loss_monitor() -> StopLossMonitor:
+    global _sl_monitor
+    if _sl_monitor is None:
+        from sentinel.config import AppSettings
+        from sentinel.mgfs.storage.mgfs_repository import MGFSRepository
+        from sentinel.storage.db import Database
+        settings = AppSettings()
+        repo = MGFSRepository(Database(settings.database_path))
+        repo.bootstrap()
+        _sl_monitor = StopLossMonitor(repo)
+    return _sl_monitor
 
 
 @router.get("/config/load/{filename}", response_class=HTMLResponse)
@@ -105,3 +120,35 @@ async def pipeline_export(batch_id: str):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={batch_id}.csv"},
     )
+
+
+# ------------------------------------------------------------------
+# Risk Alert Banner (StopLossMonitor)
+# ------------------------------------------------------------------
+
+@router.get("/risk/alerts", response_class=HTMLResponse)
+async def risk_alerts(request: Request):
+    monitor = _get_stop_loss_monitor()
+    alerts = monitor.scan()
+    return request.app.state.templates.get_template(
+        "partials/risk_alert_banner.html"
+    ).render({"request": request, "alerts": alerts})
+
+
+@router.post("/risk/dismiss", response_class=HTMLResponse)
+async def risk_dismiss(
+    request: Request,
+    symbol: str = Form(...),
+    action: str = Form(...),  # "close" or "reset"
+    new_price: float = Form(0.0),
+):
+    monitor = _get_stop_loss_monitor()
+    if action == "close":
+        monitor.dismiss_and_close_position(symbol)
+    elif action == "reset" and new_price > 0:
+        monitor.dismiss_and_reset_baseline(symbol, new_price)
+    # Re-scan to return fresh banner state
+    alerts = monitor.scan()
+    return request.app.state.templates.get_template(
+        "partials/risk_alert_banner.html"
+    ).render({"request": request, "alerts": alerts})

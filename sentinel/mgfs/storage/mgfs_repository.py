@@ -360,6 +360,22 @@ class MGFSRepository:
         finally:
             con.close()
 
+    def reset_holding_baseline(self, symbol: str, new_price: float) -> None:
+        """Reset entry_price and highest_price to new_price (dismiss path B)."""
+        con = self.database.connect()
+        try:
+            con.execute(
+                """
+                UPDATE mgfs_active_holdings
+                SET entry_price = ?,
+                    highest_price = ?
+                WHERE symbol = ?
+                """,
+                [new_price, new_price, symbol],
+            )
+        finally:
+            con.close()
+
 
 def _extract_factor_score(decision: InvestmentDecision, key: str) -> float | None:
     score = decision.factor_scores.get(key)
