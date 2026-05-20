@@ -8,6 +8,7 @@ from typing import Any
 
 from sentinel.config import AppSettings
 from sentinel.domain.models import Market
+from sentinel.mgfs.execution.stop_loss_monitor import StopLossMonitor
 from sentinel.mgfs.factor_plugin import TargetInfo
 from sentinel.mgfs.orchestrator import MGFSOrchestrator
 from sentinel.mgfs.storage.mgfs_repository import MGFSRepository
@@ -72,6 +73,25 @@ class PipelineService:
 
     def get_pipeline_results(self, batch_id: str) -> list[dict[str, Any]]:
         return self.repository.get_pipeline_results(batch_id)
+
+    def _run_stop_loss_scan(self) -> None:
+        """Post-pipeline stop-loss scan on active holdings."""
+        try:
+            monitor = StopLossMonitor(self.repository)
+            alerts = monitor.scan()
+            if alerts:
+                for alert in alerts:
+                    logger.warning(
+                        "StopLoss Alert [%s] %s %s: current=%.2f trigger=%.2f action=%s",
+                        alert.alert_type,
+                        alert.symbol,
+                        alert.name,
+                        alert.current_price,
+                        alert.trigger_price,
+                        alert.suggested_action,
+                    )
+        except Exception:
+            logger.exception("Stop-loss scan failed")
 
     def export_csv(self, batch_id: str) -> str:
         output = io.StringIO()
@@ -154,6 +174,7 @@ class PipelineService:
                 total_count=len(targets),
                 strong_buy_count=strong_buy_count,
             )
+            self._run_stop_loss_scan()
         except Exception as exc:
             logger.exception("Pipeline execution failed for batch %s", batch_id)
             self.repository.update_pipeline_batch_status(
