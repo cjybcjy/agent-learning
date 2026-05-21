@@ -15,6 +15,15 @@
      style="border-color: {% if color == 'red' %}#ef4444{% elif color == 'orange' %}#f97316{% elif color == 'yellow' %}#eab308{% else %}#22c55e{% endif %}">
   <div class="flex justify-between items-center mb-3">
     <h3 class="text-xl font-bold">{{ emoji }} {{ decision.target.symbol }} — {{ decision.rating }}</h3>
+    {% if decision.rating in ["Strong Buy", "Accumulate"] %}
+    <button hx-post="/api/paper_trade"
+            hx-vals='{"symbol": "{{ decision.target.symbol }}", "name": "{{ decision.target.name or decision.target.symbol }}", "sector": "{{ decision.target.sector or '' }}", "price": {{ decision.report_sections.get("latest_close", 0) or 100 }}, "weight": 0.2}'
+            hx-swap="outerHTML"
+            class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1"
+            title="虚拟买入并追踪止损">
+      <span>🛒</span> 挂牌影子持仓
+    </button>
+    {% endif %}
   </div>
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">

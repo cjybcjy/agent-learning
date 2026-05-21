@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from sentinel.mgfs.execution.stop_loss_monitor import StopLossMonitor
+from sentinel.mgfs.storage.mgfs_repository import MGFSRepository
 from sentinel.web.services.config_service import (
     load_config,
     save_config,
@@ -12,6 +13,18 @@ from sentinel.web.services.pipeline_service import PipelineService
 router = APIRouter()
 _pipeline_svc: PipelineService | None = None
 _sl_monitor: StopLossMonitor | None = None
+_repo_instance: MGFSRepository | None = None
+
+
+def _get_repository() -> MGFSRepository:
+    global _repo_instance
+    if _repo_instance is None:
+        from sentinel.config import AppSettings
+        from sentinel.storage.db import Database
+        settings = AppSettings()
+        _repo_instance = MGFSRepository(Database(settings.database_path))
+        _repo_instance.bootstrap()
+    return _repo_instance
 
 
 def _get_pipeline_service() -> PipelineService:
@@ -152,3 +165,47 @@ async def risk_dismiss(
     return request.app.state.templates.get_template(
         "partials/risk_alert_banner.html"
     ).render({"request": request, "alerts": alerts})
+
+
+# ------------------------------------------------------------------
+# Paper Trading Dock (shadow position)
+# ------------------------------------------------------------------
+
+@router.post("/paper_trade", response_class=HTMLResponse)
+async def paper_trade(
+    request: Request,
+    symbol: str = Form(...),
+    name: str = Form(...),
+    sector: str = Form(""),
+    price: float = Form(...),
+    weight: float = Form(...),
+):
+    if price <= 0:
+        return HTMLResponse(
+            "<span class='text-red-600 text-xs'>价格必须大于 0</span>",
+            status_code=400,
+        )
+    repo = _get_repository()
+    repo.save_active_holding(
+        symbol=symbol,
+        name=name,
+        sector=sector or None,
+        entry_price=price,
+        current_price=price,
+        highest_price=price,
+        weight=weight,
+        stop_loss_hard=-0.20,
+        stop_loss_trailing=-0.15,
+        portfolio_stop_loss=-0.10,
+    )
+    return request.app.state.templates.get_template(
+        "partials/paper_trade_success.html"
+    ).render(
+        {
+            "request": request,
+            "symbol": symbol,
+            "name": name,
+            "price": price,
+            "weight": weight,
+        }
+    )
