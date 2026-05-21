@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from sentinel.mgfs.execution.stop_loss_monitor import StopLossMonitor
+from sentinel.mgfs.evolution.backtest_cli import _run_backtest
 from sentinel.mgfs.storage.mgfs_repository import MGFSRepository
 from sentinel.web.services.config_service import (
     load_config,
@@ -207,5 +208,77 @@ async def paper_trade(
             "name": name,
             "price": price,
             "weight": weight,
+        }
+    )
+
+
+# ------------------------------------------------------------------
+# Bayes Calibration Reports
+# ------------------------------------------------------------------
+
+@router.get("/calibration/reports", response_class=HTMLResponse)
+async def calibration_reports(
+    request: Request,
+    start_date: str = "2025-01-01",
+    end_date: str = "2025-06-30",
+    symbols: str = "300750,600519",
+):
+    from datetime import date as dt_date
+    from pathlib import Path
+
+    from sentinel.config import AppSettings
+    from sentinel.mgfs.evolution.backtest_cli import _load_eastmoney_cache, _load_yaml_scores
+
+    settings = AppSettings()
+    score_path = settings.resolved_config_dir / "moat_static_base.yaml"
+    static_scores = _load_yaml_scores(score_path)
+
+    cache_dir = Path.home() / ".cache" / "sentinel" / "eastmoney"
+    start = dt_date.fromisoformat(start_date)
+    end = dt_date.fromisoformat(end_date)
+    symbol_list = [s.strip() for s in symbols.split(",")]
+
+    price_loaders: dict[str, dict[dt_date, float]] = {}
+    evaluators: dict[str, dict[dt_date, float]] = {}
+    names: dict[str, str] = {}
+
+    for symbol in symbol_list:
+        cache_files = sorted(cache_dir.glob(f"{symbol}_all_*.json"))
+        if not cache_files:
+            continue
+        try:
+            import json
+            raw_data = json.loads(cache_files[-1].read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        prices = _load_eastmoney_cache(raw_data, start, end)
+        if not prices:
+            continue
+        price_loaders[symbol] = prices
+        score = static_scores.get(symbol, 50.0)
+        evaluators[symbol] = {d: score for d in prices}
+        names[symbol] = symbol
+
+    reports = []
+    if price_loaders:
+        reports = _run_backtest(
+            symbols=list(price_loaders.keys()),
+            price_loaders=price_loaders,
+            evaluators=evaluators,
+            static_scores=static_scores,
+            names=names,
+            start_date=start,
+            end_date=end,
+            min_samples=30,
+        )
+
+    return request.app.state.templates.get_template(
+        "partials/calibration_report.html"
+    ).render(
+        {
+            "request": request,
+            "reports": reports,
+            "start_date": start_date,
+            "end_date": end_date,
         }
     )
