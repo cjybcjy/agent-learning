@@ -9,10 +9,12 @@ class _StaticBarsFetcher(PriceFetcher):
 
     def __init__(self, bars: list[OHLCV]) -> None:
         self._bars = bars
+        self.requested_days: int | None = None
 
     def fetch_ohlcv(
         self, symbol: str, market: Market, days: int = 120
     ) -> list[OHLCV]:
+        self.requested_days = days
         return self._bars
 
 
@@ -30,6 +32,56 @@ def _make_bars(n: int, close: float = 100.0, **overrides) -> list[OHLCV]:
                 volume=overrides.get("volume", 1_000_000),
             )
         )
+    return bars
+
+
+def _trend_then_pullback_bars() -> list[OHLCV]:
+    bars: list[OHLCV] = []
+    for i in range(70):
+        bars.append(
+            OHLCV(
+                date=str(20240101 + i),
+                open=88.0 + i * 0.35,
+                high=(88.0 + i * 0.35) * 1.01,
+                low=(88.0 + i * 0.35) * 0.99,
+                close=88.0 + i * 0.35,
+                volume=1_000_000,
+            )
+        )
+    for i in range(70, 90):
+        close = 112.5 + (i - 70) * 0.08
+        bars.append(
+            OHLCV(
+                date=str(20240101 + i),
+                open=close,
+                high=close * 1.01,
+                low=close * 0.99,
+                close=close,
+                volume=1_050_000,
+            )
+        )
+    for i in range(90, 119):
+        close = 115.0 - (i - 90) * 0.18
+        bars.append(
+            OHLCV(
+                date=str(20240101 + i),
+                open=close,
+                high=close * 1.01,
+                low=close * 0.99,
+                close=close,
+                volume=1_100_000,
+            )
+        )
+    bars.append(
+        OHLCV(
+            date="20240220",
+            open=110.2,
+            high=112.9,
+            low=109.8,
+            close=111.8,
+            volume=1_900_000,
+        )
+    )
     return bars
 
 
@@ -131,6 +183,56 @@ def test_exactly_60_days_is_sufficient():
 
     assert score.confidence > 0.0
     assert score.score != 50.0 or not any("不足" in w for w in score.warnings)
+
+
+def test_timing_requests_two_year_window_and_reports_sample_details():
+    """Timing 默认请求 520 个交易日，并披露实际样本长度。"""
+    bars = _make_bars(120, close=100.0, high=105.0, low=95.0)
+    fetcher = _StaticBarsFetcher(bars)
+    plugin = TimingFactorPlugin(fetcher=fetcher)
+    target = TargetInfo(
+        symbol="WINDOW", market=Market.A_SHARE, asset_class="equity"
+    )
+    score = plugin.evaluate(target)
+
+    assert fetcher.requested_days == 520
+    assert score.details["requested_days"] == 520
+    assert score.details["sample_size"] == 120
+    assert score.details["confidence_tier"] == "short_sample"
+    assert any("样本窗口" in warning for warning in score.warnings)
+
+
+def test_timing_260_days_is_one_year_confidence_tier():
+    """260 根 K 线应进入一年样本级别，而不是 80-249 的短样本级别。"""
+    bars = _make_bars(260, close=100.0, high=105.0, low=95.0)
+    fetcher = _StaticBarsFetcher(bars)
+    plugin = TimingFactorPlugin(fetcher=fetcher)
+    target = TargetInfo(
+        symbol="ONE_YEAR", market=Market.A_SHARE, asset_class="equity"
+    )
+    score = plugin.evaluate(target)
+
+    assert fetcher.requested_days == 520
+    assert score.confidence == 0.75
+    assert score.details["sample_size"] == 260
+    assert score.details["confidence_tier"] == "one_year"
+
+
+def test_timing_details_include_freqtrade_style_technical_signal():
+    """TimingFactorPlugin 把技术信号摘要写入 details，供工作站解释择时来源。"""
+    fetcher = _StaticBarsFetcher(_trend_then_pullback_bars())
+    plugin = TimingFactorPlugin(fetcher=fetcher)
+    target = TargetInfo(
+        symbol="ENTRY", market=Market.A_SHARE, asset_class="equity"
+    )
+
+    score = plugin.evaluate(target)
+
+    signal = score.details["technical_signal"]
+    assert signal["entry_label"] == "entry_watch"
+    assert "pullback_recovery" in signal["entry_tags"]
+    assert signal["exit_label"] == "none"
+    assert signal["instruction_boundary"] == "research_only"
 
 
 # ──────────────────────────────────────────────────────────────

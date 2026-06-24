@@ -4,17 +4,27 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from sentinel.mgfs.execution.stop_loss_monitor import StopLossMonitor
 from sentinel.mgfs.evolution.backtest_cli import _run_backtest
 from sentinel.mgfs.storage.mgfs_repository import MGFSRepository
+from sentinel.mgfs.target_resolver import load_target_name_map
 from sentinel.web.services.config_service import (
     load_config,
+    save_score_composition,
     save_config,
     validate_config,
 )
+from sentinel.web.services.config_change_service import ConfigChangeService
 from sentinel.web.services.pipeline_service import PipelineService
+from sentinel.web.services.research_agent_service import ResearchAgentService
+from sentinel.web.services.research_signal_collector_service import (
+    ResearchSignalCollectorService,
+)
 
 router = APIRouter()
 _pipeline_svc: PipelineService | None = None
 _sl_monitor: StopLossMonitor | None = None
 _repo_instance: MGFSRepository | None = None
+_research_agent_svc: ResearchAgentService | None = None
+_config_change_svc: ConfigChangeService | None = None
+_signal_collector_svc: ResearchSignalCollectorService | None = None
 
 
 def _get_repository() -> MGFSRepository:
@@ -35,6 +45,38 @@ def _get_pipeline_service() -> PipelineService:
     return _pipeline_svc
 
 
+def _get_research_agent_service() -> ResearchAgentService:
+    global _research_agent_svc
+    if _research_agent_svc is None:
+        _research_agent_svc = ResearchAgentService()
+    return _research_agent_svc
+
+
+def _get_config_change_service() -> ConfigChangeService:
+    global _config_change_svc
+    if _config_change_svc is None:
+        _config_change_svc = ConfigChangeService()
+    return _config_change_svc
+
+
+def _get_signal_collector_service() -> ResearchSignalCollectorService:
+    global _signal_collector_svc
+    if _signal_collector_svc is None:
+        _signal_collector_svc = ResearchSignalCollectorService()
+    return _signal_collector_svc
+
+
+def _reset_runtime_services() -> None:
+    global _pipeline_svc, _sl_monitor, _repo_instance
+    import sentinel.web.dependencies as deps
+
+    deps._orchestrator = None
+    deps._scanner = None
+    _pipeline_svc = None
+    _sl_monitor = None
+    _repo_instance = None
+
+
 def _get_stop_loss_monitor() -> StopLossMonitor:
     global _sl_monitor
     if _sl_monitor is None:
@@ -46,6 +88,146 @@ def _get_stop_loss_monitor() -> StopLossMonitor:
         repo.bootstrap()
         _sl_monitor = StopLossMonitor(repo)
     return _sl_monitor
+
+
+def _render_research_agent_panel(
+    request: Request,
+    run=None,
+    message: str | None = None,
+):
+    return request.app.state.templates.get_template(
+        "partials/research_agent_panel.html"
+    ).render(
+        {
+            "request": request,
+            "run": run,
+            "message": message,
+            "status_labels": {
+                "pending": "待处理",
+                "queued": "已加入待办",
+                "watching": "观察中",
+                "rejected": "已搁置",
+            },
+        }
+    )
+
+
+def _render_config_proposal_panel(
+    request: Request,
+    message: str | None = None,
+):
+    service = _get_config_change_service()
+    return request.app.state.templates.get_template(
+        "partials/config_proposal_panel.html"
+    ).render(
+        {
+            "request": request,
+            "proposals": service.scan_proposals(),
+            "message": message,
+            "action_labels": {
+                "add": "添加",
+                "delete": "删除",
+            },
+        }
+    )
+
+
+# ------------------------------------------------------------------
+# Daily Research Agent (read-only config suggestions)
+# ------------------------------------------------------------------
+
+
+@router.get("/research-agent/panel", response_class=HTMLResponse)
+async def research_agent_panel(request: Request):
+    _get_signal_collector_service().ensure_daily_snapshot()
+    service = _get_research_agent_service()
+    return _render_research_agent_panel(request, run=service.ensure_daily_review())
+
+
+@router.post("/research-agent/run", response_class=HTMLResponse)
+async def research_agent_run(request: Request):
+    service = _get_research_agent_service()
+    run = service.run_daily_review()
+    return _render_research_agent_panel(
+        request,
+        run=run,
+        message=f"今日研究 Agent 已生成 {len(run.suggestions)} 条只读建议",
+    )
+
+
+@router.post("/research-agent/collect", response_class=HTMLResponse)
+async def research_agent_collect(request: Request):
+    snapshot = _get_signal_collector_service().collect()
+    service = _get_research_agent_service()
+    run = service.run_daily_review()
+    return _render_research_agent_panel(
+        request,
+        run=run,
+        message=f"外部信号已更新：{len(snapshot.get('items', []))} 条",
+    )
+
+
+@router.post(
+    "/research-agent/suggestions/{suggestion_id}/status",
+    response_class=HTMLResponse,
+)
+async def research_agent_update_suggestion_status(
+    request: Request,
+    suggestion_id: str,
+    status: str = Form(...),
+):
+    service = _get_research_agent_service()
+    try:
+        updated = service.update_suggestion_status(suggestion_id, status)
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>{str(exc)}</div>",
+            status_code=400,
+        )
+    run = service.load_latest_run()
+    status_labels = {
+        "pending": "待处理",
+        "queued": "已加入待办",
+        "watching": "观察中",
+        "rejected": "已搁置",
+    }
+    return _render_research_agent_panel(
+        request,
+        run=run,
+        message=f"{updated.title} {status_labels[updated.status]}",
+    )
+
+
+@router.get("/config/proposals/panel", response_class=HTMLResponse)
+async def config_proposals_panel(request: Request):
+    return _render_config_proposal_panel(request)
+
+
+@router.post("/config/proposals/{proposal_id}/approve", response_class=HTMLResponse)
+async def config_proposal_approve(request: Request, proposal_id: str):
+    service = _get_config_change_service()
+    try:
+        proposal = service.approve_proposal(proposal_id)
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>{str(exc)}</div>",
+            status_code=400,
+        )
+    _reset_runtime_services()
+    return _render_config_proposal_panel(request, message=f"{proposal.title} 已应用")
+
+
+@router.post("/config/proposals/{proposal_id}/reject", response_class=HTMLResponse)
+async def config_proposal_reject(request: Request, proposal_id: str):
+    service = _get_config_change_service()
+    try:
+        proposal = service.reject_proposal(proposal_id)
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>{str(exc)}</div>",
+            status_code=400,
+        )
+    return _render_config_proposal_panel(request, message=f"{proposal.title} 已搁置")
 
 
 @router.get("/config/load/{filename}", response_class=HTMLResponse)
@@ -63,7 +245,11 @@ async def config_load(request: Request, filename: str):
 async def config_validate(request: Request):
     body = await request.form()
     content = body.get("content", "")
-    is_valid, errors = validate_config(content)
+    filename = body.get("filename")
+    is_valid, errors = validate_config(
+        str(content),
+        str(filename) if filename else None,
+    )
     return request.app.state.templates.get_template("partials/config_status.html").render(
         {
             "request": request,
@@ -84,6 +270,43 @@ async def config_save(
     except Exception as e:
         success = False
         message = f"保存失败: {str(e)}"
+    if success:
+        _reset_runtime_services()
+    return request.app.state.templates.get_template("partials/config_status.html").render(
+        {
+            "request": request,
+            "is_valid": success,
+            "message": message,
+        }
+    )
+
+
+@router.post("/config/score-composition", response_class=HTMLResponse)
+async def config_score_composition_save(
+    request: Request,
+    moat_weight: float = Form(...),
+    valuation_weight: float = Form(...),
+    policy_weight: float = Form(...),
+    timing_weight: float = Form(...),
+    strong_buy_min_score: float = Form(...),
+    accumulate_min_score: float = Form(...),
+    hold_watch_min_score: float = Form(...),
+):
+    try:
+        success, message = save_score_composition(
+            moat_weight=moat_weight,
+            valuation_weight=valuation_weight,
+            policy_weight=policy_weight,
+            timing_weight=timing_weight,
+            strong_buy_min_score=strong_buy_min_score,
+            accumulate_min_score=accumulate_min_score,
+            hold_watch_min_score=hold_watch_min_score,
+        )
+    except Exception as e:
+        success = False
+        message = f"保存失败: {str(e)}"
+    if success:
+        _reset_runtime_services()
     return request.app.state.templates.get_template("partials/config_status.html").render(
         {
             "request": request,
@@ -232,6 +455,7 @@ async def calibration_reports(
     settings = AppSettings()
     score_path = settings.resolved_config_dir / "moat_static_base.yaml"
     static_scores = _load_yaml_scores(score_path)
+    target_names = load_target_name_map(score_path)
 
     cache_dir = Path.home() / ".cache" / "sentinel" / "eastmoney"
     start = dt_date.fromisoformat(start_date)
@@ -257,7 +481,7 @@ async def calibration_reports(
         price_loaders[symbol] = prices
         score = static_scores.get(symbol, 50.0)
         evaluators[symbol] = {d: score for d in prices}
-        names[symbol] = symbol
+        names[symbol] = target_names.get(symbol, symbol)
 
     reports = []
     if price_loaders:

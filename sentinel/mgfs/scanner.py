@@ -57,9 +57,27 @@ class EcosystemScanner:
                         sector=cfg.get("sector"),
                         theme=cfg.get("theme"),
                         ecosystem_role=cfg.get("ecosystem_role"),
+                        fund_heavy_holding_count=_coerce_optional_int(
+                            cfg.get("fund_heavy_holding_count")
+                        ),
                     )
                 )
         return candidates
+
+    def preview_theme(
+        self,
+        *,
+        theme_name: str,
+        target_roles: list[str] | None = None,
+        fund_rank_limit: int | None = None,
+    ) -> dict[str, Any]:
+        candidates = self._get_candidates_by_theme(theme_name)
+        _, summary = self._prepare_candidates(
+            candidates,
+            target_roles=target_roles,
+            fund_rank_limit=fund_rank_limit,
+        )
+        return summary
 
     def scan_theme(
         self,
@@ -68,22 +86,23 @@ class EcosystemScanner:
         min_moat_score: float = 60.0,
         allowed_zones: list[str] | None = None,
         policy_rating: str = "neutral",
+        fund_rank_limit: int | None = None,
     ) -> ScanResult:
         if allowed_zones is None:
             allowed_zones = ["strong_buy", "accumulate"]
 
         candidates = self._get_candidates_by_theme(theme_name)
         reports: list[InvestmentDecision] = []
-        skipped_roles = 0
         skipped_moat = 0
         skipped_veto = 0
         skipped_zone = 0
+        ranked_candidates, candidate_summary = self._prepare_candidates(
+            candidates,
+            target_roles=target_roles,
+            fund_rank_limit=fund_rank_limit,
+        )
 
-        for target in candidates:
-            if target_roles and target.ecosystem_role not in target_roles:
-                skipped_roles += 1
-                continue
-
+        for target in ranked_candidates:
             try:
                 report = self.orchestrator.evaluate(target, policy_rating=policy_rating)
             except Exception:
@@ -118,12 +137,72 @@ class EcosystemScanner:
             filtered_count=len(reports),
             reports=reports,
             summary={
-                "total_candidates": len(candidates),
-                "evaluated": len(candidates) - skipped_roles,
+                **candidate_summary,
                 "passed_all_gates": len(reports),
-                "skipped_by_role": skipped_roles,
                 "skipped_by_moat": skipped_moat,
                 "skipped_by_veto": skipped_veto,
                 "skipped_by_zone": skipped_zone,
             },
         )
+
+    def _prepare_candidates(
+        self,
+        candidates: list[TargetInfo],
+        *,
+        target_roles: list[str] | None = None,
+        fund_rank_limit: int | None = None,
+    ) -> tuple[list[TargetInfo], dict[str, Any]]:
+        skipped_roles = 0
+        ranked_candidates: list[TargetInfo] = []
+
+        for target in candidates:
+            if target_roles and target.ecosystem_role not in target_roles:
+                skipped_roles += 1
+                continue
+
+            ranked_candidates.append(target)
+
+        skipped_fund_rank = 0
+        ranked_candidates = _rank_by_heavy_fund_count(ranked_candidates)
+        if fund_rank_limit is not None and fund_rank_limit > 0:
+            skipped_fund_rank = max(0, len(ranked_candidates) - fund_rank_limit)
+            ranked_candidates = ranked_candidates[:fund_rank_limit]
+
+        return ranked_candidates, {
+            "total_candidates": len(candidates),
+            "evaluated": len(ranked_candidates),
+            "skipped_by_role": skipped_roles,
+            "skipped_by_fund_rank": skipped_fund_rank,
+            "fund_rank_limit": fund_rank_limit,
+        }
+
+
+def _coerce_optional_int(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _rank_by_heavy_fund_count(targets: list[TargetInfo]) -> list[TargetInfo]:
+    ranked = sorted(
+        targets,
+        key=lambda target: (-(target.fund_heavy_holding_count or 0), target.symbol),
+    )
+    return [
+        TargetInfo(
+            symbol=target.symbol,
+            market=target.market,
+            asset_class=target.asset_class,
+            name=target.name,
+            sector=target.sector,
+            theme=target.theme,
+            ecosystem_role=target.ecosystem_role,
+            fund_heavy_holding_count=target.fund_heavy_holding_count,
+            fund_heavy_holding_rank=index,
+            tags=target.tags,
+        )
+        for index, target in enumerate(ranked, start=1)
+    ]

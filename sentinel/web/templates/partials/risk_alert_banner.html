@@ -1,46 +1,53 @@
 {% if alerts %}
-<div id="risk-alert-banner" class="mb-6 animate-pulse">
+<div id="risk-alert-banner" class="grid gap-2">
   {% for alert in alerts %}
-  <div class="bg-red-600 text-white rounded-lg shadow-lg p-4 mb-2 flex items-start justify-between">
-    <div class="flex items-start gap-3">
-      <i data-lucide="alert-triangle" class="w-6 h-6 shrink-0 mt-0.5"></i>
-      <div>
-        <div class="font-bold text-sm">
-          [{{ alert.alert_type }}] {{ alert.symbol }} {{ alert.name }}
+  <div class="risk-alert-card rounded-md border border-red-200 bg-red-50 p-4">
+    <div class="risk-alert-row flex flex-wrap items-start justify-between gap-3">
+      <div class="risk-alert-copy flex min-w-0 flex-1 items-start gap-3">
+        <div class="mt-0.5 rounded-md bg-red-600 text-white p-1.5">
+          <i data-lucide="alert-triangle" class="w-4 h-4"></i>
         </div>
-        <div class="text-xs text-red-100 mt-1">
-          当前价: {{ "%.2f"|format(alert.current_price) }} |
-          触发线: {{ "%.2f"|format(alert.trigger_price) }} |
-          建议: <span class="font-bold">{{ alert.suggested_action }}</span>
+        <div class="min-w-0">
+          <div class="font-black text-sm text-red-900 break-words">
+            [{{ alert.alert_type }}] {{ alert.symbol }} {{ alert.name }}
+          </div>
+          <div class="text-xs text-red-800 mt-1 mono break-words">
+            当前 {{ "%.2f"|format(alert.current_price) }} ·
+            触发 {{ "%.2f"|format(alert.trigger_price) }} ·
+            {{ alert.suggested_action }}
+          </div>
         </div>
       </div>
-    </div>
-    <div class="flex gap-2 shrink-0">
-      {% if alert.symbol != 'PORTFOLIO' %}
-      <button hx-post="/api/risk/dismiss"
-              hx-vals='{"symbol": "{{ alert.symbol }}", "action": "close"}'
-              hx-target="#risk-alert-banner"
-              class="bg-white text-red-600 text-xs px-3 py-1.5 rounded hover:bg-red-50 font-medium">
-        确认清仓
-      </button>
-      <button hx-post="/api/risk/dismiss"
-              hx-vals='{"symbol": "{{ alert.symbol }}", "action": "reset", "new_price": {{ alert.current_price }}}'
-              hx-target="#risk-alert-banner"
-              class="bg-red-700 text-white text-xs px-3 py-1.5 rounded hover:bg-red-800 font-medium border border-red-500">
-        重置防线
-      </button>
-      {% else %}
-      <span class="text-xs text-red-200 bg-red-700 px-3 py-1.5 rounded">立即检查组合</span>
-      {% endif %}
+      <div class="risk-alert-actions flex flex-wrap justify-end gap-2">
+        {% if alert.symbol != 'PORTFOLIO' %}
+        <button hx-post="/api/risk/dismiss"
+                hx-vals='{"symbol": "{{ alert.symbol }}", "action": "close"}'
+                hx-target="#risk-alert-banner"
+                class="ws-button ghost text-xs">
+          确认清仓
+        </button>
+        <button hx-post="/api/risk/dismiss"
+                hx-vals='{"symbol": "{{ alert.symbol }}", "action": "reset", "new_price": {{ alert.current_price }}}'
+                hx-target="#risk-alert-banner"
+                class="ws-button primary text-xs">
+          重置防线
+        </button>
+        {% else %}
+        <span class="status-chip warn">立即检查组合</span>
+        {% endif %}
+      </div>
     </div>
   </div>
   {% endfor %}
 </div>
 {% else %}
-<div id="risk-alert-banner" class="mb-6">
-  <div class="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-2 flex items-center gap-2 text-sm">
-    <i data-lucide="shield-check" class="w-4 h-4"></i>
-    <span>风控正常 — 无活跃警报</span>
+<div id="risk-alert-banner">
+  <div class="rounded-md border border-green-200 bg-green-50 px-3 py-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+    <div class="flex items-center gap-2 text-green-800">
+      <i data-lucide="shield-check" class="w-4 h-4"></i>
+      <span class="font-bold">风控正常</span>
+    </div>
+    <span class="text-xs text-green-700 mono">No active alerts</span>
   </div>
 </div>
 {% endif %}

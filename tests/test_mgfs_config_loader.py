@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from sentinel.mgfs.config_loader import build_orchestrator, load_mgfs_config
+from sentinel.mgfs.config_validator import MGFSConfigValidationError
 from sentinel.mgfs.factor_plugin import BaseFactorPlugin, FactorScore, TargetInfo
 from sentinel.mgfs.orchestrator import MGFSOrchestrator
 
@@ -68,6 +69,28 @@ rating_thresholds:
 
     assert isinstance(orchestrator, MGFSOrchestrator)
     assert "moat" in orchestrator.plugins
+
+
+def test_build_orchestrator_rejects_invalid_config_before_plugin_loading():
+    config = {
+        "modules": {
+            "moat": {
+                "enabled": True,
+                "class_path": "tests.test_mgfs_config_loader.TestMoatPlugin",
+            }
+        },
+        "scoring_formula": {"moat": {"weight": -0.1}},
+        "policy_multiplier": {"neutral": {"multiplier": 1.0}},
+        "circuit_breakers": {},
+        "rating_thresholds": {
+            "avoid": {"min_score": 0.0, "label": "Avoid", "action": "avoid"}
+        },
+    }
+
+    with pytest.raises(MGFSConfigValidationError) as exc_info:
+        build_orchestrator(config)
+
+    assert "scoring_formula.moat.weight" in str(exc_info.value)
 
 
 def test_load_plugin_rejects_non_subclass():

@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 
 from sentinel.mgfs.factor_plugin import BaseFactorPlugin
+from sentinel.mgfs.config_validator import validate_mgfs_config
 from sentinel.mgfs.orchestrator import MGFSOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,8 @@ def build_orchestrator(
     Returns:
         An initialized MGFSOrchestrator with loaded plugins and settings.
     """
+    validate_mgfs_config(config, raise_on_error=True)
+
     modules = config.get("modules", {})
     scoring_formula = config.get("scoring_formula", {})
     policy_multipliers = _extract_policy_multipliers(

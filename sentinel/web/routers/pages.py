@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from sentinel.web.services.config_service import load_score_composition
+from sentinel.web.services.theme_service import load_macro_themes
+
 router = APIRouter()
 
 
@@ -12,7 +15,13 @@ async def root():
 @router.get("/dashboard/research", response_class=HTMLResponse)
 async def research_page(request: Request):
     return request.app.state.templates.TemplateResponse(
-        request=request, name="research.html", context={"active_nav": "research"}
+        request=request,
+        name="research.html",
+        context={
+            "active_nav": "research",
+            "macro_themes": load_macro_themes(),
+            "score_composition": load_score_composition(),
+        },
     )
 
 

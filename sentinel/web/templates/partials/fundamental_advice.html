@@ -1,0 +1,96 @@
+<div class="border-t border-slate-200 pt-4 mt-4" data-testid="fundamental-advice-panel">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+    <div class="text-sm font-bold flex items-center gap-2">
+      <i data-lucide="brain-circuit" class="w-4 h-4"></i>
+      TradingAgents 基本面建议
+    </div>
+    <span class="text-xs font-semibold text-slate-500">不自动写入配置</span>
+  </div>
+
+  {% if advice.status == "unavailable" %}
+  <div class="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-yellow-800 text-sm">
+    {{ advice.summary }}
+  </div>
+  {% else %}
+  <div class="metric-strip mb-3">
+    <div class="metric-tile">
+      <div class="metric-label">Provider</div>
+      <div class="metric-value text-base">{{ advice.provider }}</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-label">Ticker</div>
+      <div class="metric-value text-base">{{ advice.ticker }}</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-label">建议数量</div>
+      <div class="metric-value text-base">{{ advice.proposals|length }}</div>
+    </div>
+  </div>
+
+  <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 mb-3">
+    {{ advice.summary }}
+  </div>
+
+  {% if advice.proposals %}
+  <div class="overflow-x-auto mb-3">
+    <table class="terminal-table">
+      <thead>
+        <tr>
+          <th>维度</th>
+          <th>当前分</th>
+          <th>建议分</th>
+          <th>置信度</th>
+          <th>配置路径</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for proposal in advice.proposals %}
+        <tr>
+          <td>{{ proposal.label }}</td>
+          <td class="mono">{{ "%.1f"|format(proposal.current_score) if proposal.current_score is not none else "—" }}</td>
+          <td class="mono font-bold">{{ "%.1f"|format(proposal.proposed_score) }}</td>
+          <td class="mono">{{ "%.0f"|format(proposal.confidence * 100) }}%</td>
+          <td class="mono text-xs">{{ proposal.path }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 mb-3">
+    TradingAgents 已返回研究材料，但没有结构化维度评分；当前仅作为证据，不生成 YAML 分数建议。
+  </div>
+  {% endif %}
+
+  <div class="agent-evidence-grid">
+    <div class="agent-evidence-box">
+      <div class="agent-evidence-title">
+        <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+        支持证据
+      </div>
+      {% for evidence in advice.evidence %}
+      <div class="agent-evidence-item">
+        <strong>{{ evidence.source }} · {{ evidence.title }}</strong>
+        <span>{{ evidence.detail }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="agent-evidence-box counter">
+      <div class="agent-evidence-title">
+        <i data-lucide="scale" class="w-4 h-4"></i>
+        反向证据
+      </div>
+      {% for evidence in advice.counter_evidence %}
+      <div class="agent-evidence-item">
+        <strong>{{ evidence.source }} · {{ evidence.title }}</strong>
+        <span>{{ evidence.detail }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  if (window.lucide) window.lucide.createIcons();
+</script>

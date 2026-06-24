@@ -10,76 +10,305 @@
 } %}
 {% set color = alert_colors.get(decision.alert_level.value, "gray") %}
 {% set emoji = rating_emojis.get(decision.rating, "⚪") %}
+{% set border_color = "#dc2626" if color == "red" else ("#f97316" if color == "orange" else ("#ca8a04" if color == "yellow" else "#16a34a")) %}
 
-<div class="rounded-lg border-l-4 p-4 bg-white shadow"
-     style="border-color: {% if color == 'red' %}#ef4444{% elif color == 'orange' %}#f97316{% elif color == 'yellow' %}#eab308{% else %}#22c55e{% endif %}">
-  <div class="flex justify-between items-center mb-3">
-    <h3 class="text-xl font-bold">{{ emoji }} {{ decision.target.symbol }} — {{ decision.rating }}</h3>
+<div class="rounded-md border bg-white overflow-hidden"
+     style="border-left: 4px solid {{ border_color }};">
+  <div class="px-4 py-3 border-b border-slate-200 flex items-start justify-between gap-3">
+    <div>
+      <div class="text-xs font-bold text-slate-500 uppercase tracking-wide">Decision Ticket</div>
+      <h3 class="text-xl font-black leading-tight mt-1">{{ emoji }} {{ decision.target.symbol }} — {{ decision.rating }}</h3>
+      <div class="text-sm text-slate-500 mt-1">{{ decision.target.name or decision.target.symbol }} · {{ decision.target.sector or "未分组" }}</div>
+    </div>
     {% if decision.rating in ["Strong Buy", "Accumulate"] %}
     <button hx-post="/api/paper_trade"
             hx-vals='{"symbol": "{{ decision.target.symbol }}", "name": "{{ decision.target.name or decision.target.symbol }}", "sector": "{{ decision.target.sector or '' }}", "price": {{ decision.report_sections.get("latest_close", 0) or 100 }}, "weight": 0.2}'
             hx-swap="outerHTML"
-            class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1"
+            class="ws-button primary text-xs"
             title="虚拟买入并追踪止损">
-      <span>🛒</span> 挂牌影子持仓
+      <i data-lucide="briefcase-business" class="w-4 h-4"></i>
+      影子持仓
     </button>
     {% endif %}
   </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
-    <div>最终得分: <span class="font-bold text-lg">{{ "%.2f"|format(decision.final_score) }}</span></div>
-    <div>综合置信度: <span class="font-bold">{{ "%.0f"|format(decision.report_sections.get("overall_confidence", 0) * 100) }}%</span></div>
-    <div>政策乘数: {{ decision.policy_multiplier }}</div>
-    <div>建议: {{ decision.action }}</div>
-  </div>
-
-  <hr class="my-2">
-
-  <div class="text-sm space-y-1">
-    {% for key, score in decision.factor_scores.items() %}
-    <div class="flex justify-between">
-      <span>{{ score.factor_name }}</span>
-      <span class="font-mono">{{ "%.1f"|format(score.score) }}/100 (置信度 {{ "%.0f"|format(score.confidence * 100) }}%)</span>
+  <div class="p-4">
+    <div class="metric-strip">
+      <div class="metric-tile">
+        <div class="metric-label">最终得分</div>
+        <div class="metric-value">{{ "%.2f"|format(decision.final_score) }}</div>
+      </div>
+      <div class="metric-tile">
+        <div class="metric-label">综合置信度</div>
+        <div class="metric-value">{{ "%.0f"|format(decision.report_sections.get("overall_confidence", 0) * 100) }}%</div>
+      </div>
+      <div class="metric-tile">
+        <div class="metric-label">政策乘数</div>
+        <div class="metric-value">{{ decision.policy_multiplier }}</div>
+      </div>
     </div>
-    {% endfor %}
+
+    <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm mb-4">
+      <span class="font-bold text-slate-700">建议</span>
+      <span class="ml-2 text-slate-700">{{ decision.action }}</span>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <button type="button"
+              hx-post="/api/fundamental-advice"
+              hx-vals='{"symbol": "{{ decision.target.symbol }}", "market": "{{ decision.target.market.name }}"}'
+              hx-target="#fundamental-advice-result"
+              hx-swap="innerHTML"
+              hx-indicator="#fundamental-advice-loading"
+              class="ws-button ghost"
+              title="调用 TradingAgents 生成只读基本面评分建议">
+        <i data-lucide="brain-circuit" class="w-4 h-4"></i>
+        基本面建议
+      </button>
+      <button type="button"
+              hx-post="/api/serenity-verification-plan"
+              hx-vals='{"symbol": "{{ decision.target.symbol }}", "market": "{{ decision.target.market.name }}"}'
+              hx-target="#serenity-verification-result"
+              hx-swap="innerHTML"
+              hx-indicator="#serenity-verification-loading"
+              class="ws-button ghost"
+              title="按 Serenity 方法生成护城河证据与动态指标采集路线图">
+        <i data-lucide="route" class="w-4 h-4"></i>
+        补证据路线
+      </button>
+      <span id="fundamental-advice-loading" class="htmx-indicator text-xs text-slate-500">
+        TradingAgents 分析中...
+      </span>
+      <span id="serenity-verification-loading" class="htmx-indicator text-xs text-slate-500">
+        Serenity 路线生成中...
+      </span>
+    </div>
+    <div id="fundamental-advice-result"></div>
+    <div id="serenity-verification-result"></div>
+
+    <div class="overflow-x-auto mb-4">
+      <table class="terminal-table">
+        <thead>
+          <tr>
+            <th>因子</th>
+            <th>评分</th>
+            <th>置信度</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for key, score in decision.factor_scores.items() %}
+          <tr>
+            <td>{{ score.factor_name }}</td>
+            <td class="mono font-bold">{{ "%.1f"|format(score.score) }}/100</td>
+            <td class="mono">{{ "%.0f"|format(score.confidence * 100) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% set timing_score = decision.factor_scores.get("timing") %}
+    {% set technical_signal = timing_score.details.get("technical_signal") if timing_score else none %}
+    {% set timing_warnings = (timing_score.warnings if timing_score else []) or [] %}
+    {% if technical_signal %}
+    {% set tag_labels = {
+      "pullback_recovery": "回踩修复",
+      "ma_stack_constructive": "均线结构",
+      "volume_breakdown": "放量破位",
+      "trend_breakdown": "趋势破位"
+    } %}
+    <div class="border-t border-slate-200 pt-4 mb-4" data-testid="technical-signal-panel">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="text-sm font-bold flex items-center gap-2">
+          <i data-lucide="activity" class="w-4 h-4"></i>
+          技术信号
+        </div>
+        {% if technical_signal.instruction_boundary == "research_only" %}
+        <span class="text-xs font-semibold text-slate-500">仅供研究</span>
+        {% endif %}
+      </div>
+
+      <div class="metric-strip mb-3">
+        <div class="metric-tile">
+          <div class="metric-label">观察状态</div>
+          <div class="metric-value text-base">
+            {{ "观察触发" if technical_signal.entry_label == "entry_watch" else "未触发" }}
+          </div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">风险状态</div>
+          <div class="metric-value text-base">
+            {{ "风险触发" if technical_signal.exit_label == "exit_risk" else "未触发" }}
+          </div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">RSI14</div>
+          <div class="metric-value text-base">
+            {{ "%.1f"|format(technical_signal.rsi14) if technical_signal.rsi14 is not none else "—" }}
+          </div>
+        </div>
+      </div>
+
+      <div class="grid gap-3 md:grid-cols-2 text-sm">
+        <div class="bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+          <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">观察依据</div>
+          {% set entry_tags = technical_signal.entry_tags or [] %}
+          {% if entry_tags %}
+          <div class="flex flex-wrap gap-1">
+            {% for tag in entry_tags %}
+            <span class="inline-block px-2 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-800 text-xs">
+              {{ tag_labels.get(tag, tag) }}
+            </span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-slate-500">暂无触发</div>
+          {% endif %}
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+          <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">风险依据</div>
+          {% set exit_tags = technical_signal.exit_tags or [] %}
+          {% if exit_tags %}
+          <div class="flex flex-wrap gap-1">
+            {% for tag in exit_tags %}
+            <span class="inline-block px-2 py-0.5 rounded border border-red-200 bg-red-50 text-red-800 text-xs">
+              {{ tag_labels.get(tag, tag) }}
+            </span>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if timing_warnings %}
+          <div class="mt-2 text-xs font-bold text-red-700">择时风险</div>
+          <ul class="mt-1 space-y-1 text-xs text-red-700">
+            {% for warning in timing_warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          {% if not exit_tags and not timing_warnings %}
+          <div class="text-slate-500">暂无触发</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="grid gap-2 md:grid-cols-4 mt-3 text-xs text-slate-600">
+        <div>MA60: <span class="mono font-semibold">{{ "%.2f"|format(technical_signal.ma60) if technical_signal.ma60 is not none else "—" }}</span></div>
+        <div>乖离: <span class="mono font-semibold">{{ "%.2f"|format(technical_signal.bias60 * 100) if technical_signal.bias60 is not none else "—" }}%</span></div>
+        <div>量比20: <span class="mono font-semibold">{{ "%.2f"|format(technical_signal.volume_ratio20) if technical_signal.volume_ratio20 is not none else "—" }}</span></div>
+        <div>斜率20: <span class="mono font-semibold">{{ "%.2f"|format(technical_signal.ma60_slope20 * 100) if technical_signal.ma60_slope20 is not none else "—" }}%</span></div>
+        <div>观察区间: <span class="mono font-semibold">{{ "%.2f"|format(technical_signal.entry_zone_low) if technical_signal.entry_zone_low is not none else "—" }} / {{ "%.2f"|format(technical_signal.entry_zone_high) if technical_signal.entry_zone_high is not none else "—" }}</span></div>
+        <div>风险参考: <span class="mono font-semibold">{{ "%.2f"|format(technical_signal.stop_reference) if technical_signal.stop_reference is not none else "—" }}</span></div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if decision.circuit_breakers_triggered %}
+    <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700 text-sm font-medium mb-3">
+      {% for cb in decision.circuit_breakers_triggered %}
+      <div>[{{ cb.get("alert_level", "unknown").upper() }}] {{ cb["message"] }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if decision.report_sections.get("watermark") %}
+    <div class="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-yellow-800 text-sm mb-3">
+      {{ decision.report_sections["watermark"] }}
+    </div>
+    <div class="rounded-md border border-yellow-200 bg-white px-3 py-3 text-sm mb-3" data-testid="data-gap-reasons">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div class="font-bold text-slate-800 flex items-center gap-2">
+          <i data-lucide="list-tree" class="w-4 h-4"></i>
+          缺失原因
+        </div>
+        <div class="text-xs text-slate-500">
+          总体置信度
+          <span class="mono font-bold text-slate-800">
+            {{ "%.0f"|format(decision.report_sections.get("overall_confidence", 0) * 100) }}%
+          </span>
+          {% if decision.report_sections.get("inactive_weight") %}
+          <span class="ml-2">
+            未计权重
+            <span class="mono font-bold text-slate-800">
+              {{ "%.0f"|format(decision.report_sections.get("inactive_weight", 0) * 100) }}%
+            </span>
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="grid gap-2 md:grid-cols-2">
+        {% for key, score in decision.factor_scores.items() %}
+        {% set details = score.details or {} %}
+        {% set sample_size = details.get("sample_size") %}
+        {% set requested_days = details.get("requested_days") %}
+        {% set confidence_tier = details.get("confidence_tier") %}
+        {% set has_sample_shortfall = sample_size is not none and requested_days is not none and sample_size < requested_days %}
+        {% set warnings_belong_to_technical_signal = key == "timing" and technical_signal and score.confidence >= 0.8 and not has_sample_shortfall %}
+        {% set warnings_explain_gap = score.warnings and not warnings_belong_to_technical_signal %}
+        {% if score.confidence < 0.8 or has_sample_shortfall or warnings_explain_gap %}
+        <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-bold text-slate-700">{{ score.factor_name }}</span>
+            <span class="mono text-xs font-bold {{ 'text-yellow-700' if score.confidence < 0.8 else 'text-slate-600' }}">
+              {{ "%.0f"|format(score.confidence * 100) }}%
+            </span>
+          </div>
+          {% if sample_size is not none or requested_days is not none %}
+          <div class="mt-1 text-xs text-slate-600">
+            样本窗口
+            <span class="mono font-semibold">
+              {{ sample_size if sample_size is not none else "—" }}/{{ requested_days if requested_days is not none else "—" }}
+            </span>
+            {% if confidence_tier %}
+            <span class="ml-2">置信层级 <span class="mono font-semibold">{{ confidence_tier }}</span></span>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if warnings_explain_gap %}
+          <ul class="mt-2 space-y-1 text-xs text-yellow-800">
+            {% for warning in score.warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+          </ul>
+          {% elif score.confidence < 0.8 %}
+          <div class="mt-2 text-xs text-yellow-800">置信度低于完整阈值，拖低总体置信度。</div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if moat_radar_data %}
+    <div class="border-t border-slate-200 pt-4 mt-4">
+      <div class="text-sm font-bold mb-2 flex items-center gap-2">
+        <i data-lucide="radar" class="w-4 h-4"></i>
+        护城河五维雷达
+      </div>
+      <div
+        id="moat-radar-chart"
+        class="w-full"
+        style="height: 280px;"
+        data-moat-dims='{{ moat_radar_data | tojson }}'
+      ></div>
+    </div>
+    {% endif %}
+
+    {% if valuation_band_data %}
+    <div class="border-t border-slate-200 pt-4 mt-4">
+      <div class="text-sm font-bold mb-2">
+        {{ valuation_band_data.metric_label }} 历史走势
+        <span class="text-xs text-slate-400 ml-1">(10%: {{ valuation_band_data.p10 }} / 中位: {{ valuation_band_data.p50 }} / 90%: {{ valuation_band_data.p90 }})</span>
+      </div>
+      <div
+        id="valuation-band-chart"
+        class="w-full"
+        style="height: 280px;"
+        data-val-band='{{ valuation_band_data | tojson }}'
+      ></div>
+    </div>
+    {% endif %}
   </div>
-
-  {% if decision.circuit_breakers_triggered %}
-  <div class="mt-3 text-red-600 text-sm font-medium">
-    {% for cb in decision.circuit_breakers_triggered %}
-    🔴 [{{ cb.get("alert_level", "unknown").upper() }}] {{ cb["message"] }}<br>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  {% if decision.report_sections.get("watermark") %}
-  <div class="mt-2 text-yellow-700 text-sm">⚠️ {{ decision.report_sections["watermark"] }}</div>
-  {% endif %}
-
-  {% if moat_radar_data %}
-  <hr class="my-3">
-  <div class="text-sm font-medium mb-2">护城河五维雷达</div>
-  <div
-    id="moat-radar-chart"
-    class="w-full"
-    style="height: 280px;"
-    data-moat-dims='{{ moat_radar_data | tojson }}'
-  ></div>
-  {% endif %}
-
-  {% if valuation_band_data %}
-  <hr class="my-3">
-  <div class="text-sm font-medium mb-2">
-    {{ valuation_band_data.metric_label }} 历史走势
-    <span class="text-xs text-gray-400 ml-1">(10%分位: {{ valuation_band_data.p10 }} / 中位: {{ valuation_band_data.p50 }} / 90%分位: {{ valuation_band_data.p90 }})</span>
-  </div>
-  <div
-    id="valuation-band-chart"
-    class="w-full"
-    style="height: 280px;"
-    data-val-band='{{ valuation_band_data | tojson }}'
-  ></div>
-  {% endif %}
 
   <script>
     document.body.dispatchEvent(new Event('render-echarts'));

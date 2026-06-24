@@ -1,0 +1,106 @@
+version: "1.0"
+last_updated: "2026-05-15"
+description: "MGFS Module B — 估值范式路由与击球区定义"
+
+archetypes:
+  traditional_growth:
+    label: "传统价值成长"
+    metrics:
+      primary:   { name: "PE_TTM", weight: 0.50 }
+      secondary: { name: "PEG", weight: 0.30 }
+      warning:   { name: "Dividend_Yield", weight: 0.20 }
+    zones:
+      strong_buy:  { percentile_max: 20, score_range: [90, 100] }
+      accumulate:  { percentile_max: 40, score_range: [75, 90]  }
+      hold:        { percentile_max: 70, score_range: [50, 75]  }
+      avoid:       { percentile_max: 100, score_range: [0, 50]  }
+    circuit_breakers:
+      hard_veto_percentile: 90
+    timing:
+      ideal_band: 0.02
+      acceptable_band: 0.05
+      slope_veto_threshold: -0.03
+      max_bonus: 10.0
+      max_penalty: -40.0
+      bullish_ref: 0.02
+      atr_baseline: 0.015
+      atr_k: 1.0
+      atr_min_mult: 0.5
+      atr_max_mult: 2.0
+
+  heavy_asset_cyclical:
+    label: "重资产与强周期"
+    metrics:
+      primary:   { name: "PB", weight: 0.50 }
+      secondary: { name: "ROE", weight: 0.30 }
+      warning:   { name: "Operating_CF_Yield", weight: 0.20 }
+    zones:
+      strong_buy:  { percentile_max: 15, score_range: [90, 100] }
+      accumulate:  { percentile_max: 30, score_range: [75, 90]  }
+      hold:        { percentile_max: 65, score_range: [50, 75]  }
+      avoid:       { percentile_max: 100, score_range: [0, 50]  }
+    circuit_breakers:
+      hard_veto_percentile: 85
+    timing:
+      ideal_band: 0.03
+      acceptable_band: 0.08
+      slope_veto_threshold: -0.025
+      max_bonus: 10.0
+      max_penalty: -40.0
+      bullish_ref: 0.02
+      atr_baseline: 0.020
+      atr_k: 1.0
+      atr_min_mult: 0.5
+      atr_max_mult: 2.0
+
+  saas_and_tech:
+    label: "SaaS与前沿科技"
+    metrics:
+      primary:   { name: "PS_TTM",       weight: 0.50 }
+      secondary: { name: "EV_Sales",     weight: 0.30 }
+      warning:   { name: "Gross_Margin", weight: 0.20 }
+    zones:
+      strong_buy:  { percentile_max: 25, score_range: [90, 100] }
+      accumulate:  { percentile_max: 45, score_range: [75, 90]  }
+      hold:        { percentile_max: 75, score_range: [50, 75]  }
+      avoid:       { percentile_max: 100, score_range: [0, 50]  }
+    circuit_breakers:
+      hard_veto_percentile: 88
+    timing:
+      ideal_band: 0.05
+      acceptable_band: 0.10
+      slope_veto_threshold: -0.04
+      max_bonus: 10.0
+      max_penalty: -40.0
+      bullish_ref: 0.03
+      atr_baseline: 0.025
+      atr_k: 1.0
+      atr_min_mult: 0.5
+      atr_max_mult: 2.0
+
+sector_to_archetype:
+  "白酒": "traditional_growth"
+  "医药生物": "traditional_growth"
+  "食品饮料": "traditional_growth"
+  "家用电器": "traditional_growth"
+  "电子": "traditional_growth"
+  "医疗器械": "traditional_growth"
+  "工业自动化": "traditional_growth"
+  "机器人": "traditional_growth"
+  "汽车零部件": "traditional_growth"
+  "银行": "heavy_asset_cyclical"
+  "保险": "heavy_asset_cyclical"
+  "煤炭": "heavy_asset_cyclical"
+  "有色金属": "heavy_asset_cyclical"
+  "钢铁": "heavy_asset_cyclical"
+  "化工": "heavy_asset_cyclical"
+  "房地产": "heavy_asset_cyclical"
+  "新能源汽车": "saas_and_tech"
+  "人工智能": "saas_and_tech"
+  "半导体": "saas_and_tech"
+  "云计算": "saas_and_tech"
+  "软件服务": "saas_and_tech"
+
+default_archetype: "traditional_growth"
+
+override_archetypes: {}

@@ -104,6 +104,45 @@ def test_orchestrator_policy_multiplier_applied():
     assert decision.final_score == 96.0  # 80 * 1.2
 
 
+def test_orchestrator_uses_policy_factor_multiplier_when_available():
+    class MockPolicyPlugin(BaseFactorPlugin):
+        factor_key = "policy"
+        factor_name = "国策环境"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(
+                factor_key="policy",
+                factor_name="国策环境",
+                score=120.0,
+                weight=0.0,
+                details={
+                    "multiplier": 1.2,
+                    "policy_rating": "core_support",
+                    "note": "配置文件行业规则",
+                },
+            )
+
+    orchestrator = MGFSOrchestrator(
+        plugins=[MockMoatPlugin(), MockPolicyPlugin()],
+        scoring_weights={"moat": 1.0, "policy": 0.0},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {"min_score": 90.0, "label": "Strong Buy", "action": "buy"},
+            {"min_score": 0.0, "label": "Avoid", "action": "avoid"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+
+    assert decision.raw_total == 80.0
+    assert decision.policy_multiplier == 1.2
+    assert decision.final_score == 96.0
+    assert decision.report_sections["policy_source"] == "policy_factor"
+    assert decision.report_sections["effective_policy_rating"] == "core_support"
+
+
 def test_orchestrator_circuit_breaker_triggers():
     orchestrator = MGFSOrchestrator(
         plugins=[MockMoatPlugin()],
@@ -176,6 +215,136 @@ def test_orchestrator_rating_classification():
     decision = orchestrator.evaluate(target, policy_rating="neutral")
     assert decision.rating == "Accumulate"
     assert decision.action == "分批建仓"
+
+
+def test_orchestrator_downgrades_strong_buy_when_rating_gate_fails():
+    class HighMoatWeakEvidencePlugin(BaseFactorPlugin):
+        factor_key = "moat"
+        factor_name = "护城河"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(
+                factor_key="moat",
+                factor_name="护城河",
+                score=95.0,
+                confidence=0.9,
+                details={"evidence_coverage": 0.2},
+            )
+
+    class StrongValuationPlugin(BaseFactorPlugin):
+        factor_key = "valuation"
+        factor_name = "估值"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(
+                factor_key="valuation",
+                factor_name="估值",
+                score=95.0,
+                confidence=0.85,
+                details={"zone": "strong_buy"},
+            )
+
+    orchestrator = MGFSOrchestrator(
+        plugins=[HighMoatWeakEvidencePlugin(), StrongValuationPlugin()],
+        scoring_weights={"moat": 0.6, "valuation": 0.4},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {
+                "min_score": 90.0,
+                "label": "Strong Buy",
+                "action": "重仓出击",
+                "min_overall_confidence": 0.8,
+                "required_factors": {
+                    "moat": {
+                        "min_score": 80.0,
+                        "min_confidence": 0.8,
+                        "details": {"evidence_coverage": {"min": 0.8}},
+                    },
+                    "valuation": {
+                        "min_confidence": 0.7,
+                        "details": {"zone": {"in": ["strong_buy"]}},
+                    },
+                },
+            },
+            {"min_score": 75.0, "label": "Accumulate", "action": "分批建仓"},
+            {"min_score": 0.0, "label": "Avoid", "action": "回避"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+
+    assert decision.final_score == 95.0
+    assert decision.rating == "Accumulate"
+    assert decision.action == "分批建仓"
+    failures = decision.report_sections["rating_gate_failures"]
+    assert any(item["path"] == "moat.details.evidence_coverage" for item in failures)
+    assert "Strong Buy 证据不足" in decision.report_sections["watermark"]
+
+
+def test_orchestrator_keeps_strong_buy_when_rating_gate_passes():
+    class HighMoatStrongEvidencePlugin(BaseFactorPlugin):
+        factor_key = "moat"
+        factor_name = "护城河"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(
+                factor_key="moat",
+                factor_name="护城河",
+                score=95.0,
+                confidence=0.9,
+                details={"evidence_coverage": 0.92},
+            )
+
+    class StrongValuationPlugin(BaseFactorPlugin):
+        factor_key = "valuation"
+        factor_name = "估值"
+
+        def evaluate(self, target: TargetInfo) -> FactorScore:
+            return FactorScore(
+                factor_key="valuation",
+                factor_name="估值",
+                score=95.0,
+                confidence=0.85,
+                details={"zone": "strong_buy"},
+            )
+
+    orchestrator = MGFSOrchestrator(
+        plugins=[HighMoatStrongEvidencePlugin(), StrongValuationPlugin()],
+        scoring_weights={"moat": 0.6, "valuation": 0.4},
+        policy_multipliers={"neutral": 1.0},
+        circuit_breakers=[],
+        rating_thresholds=[
+            {
+                "min_score": 90.0,
+                "label": "Strong Buy",
+                "action": "重仓出击",
+                "min_overall_confidence": 0.8,
+                "required_factors": {
+                    "moat": {
+                        "min_score": 80.0,
+                        "min_confidence": 0.8,
+                        "details": {"evidence_coverage": {"min": 0.8}},
+                    },
+                    "valuation": {
+                        "min_confidence": 0.7,
+                        "details": {"zone": {"in": ["strong_buy"]}},
+                    },
+                },
+            },
+            {"min_score": 75.0, "label": "Accumulate", "action": "分批建仓"},
+            {"min_score": 0.0, "label": "Avoid", "action": "回避"},
+        ],
+    )
+    target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
+
+    decision = orchestrator.evaluate(target, policy_rating="neutral")
+
+    assert decision.final_score == 95.0
+    assert decision.rating == "Strong Buy"
+    assert decision.action == "重仓出击"
+    assert decision.report_sections["rating_gate_failures"] == []
 
 
 def test_disabled_circuit_breaker_does_not_trigger():
@@ -501,8 +670,8 @@ class MockValuationPluginZeroConf(BaseFactorPlugin):
         )
 
 
-def test_weight_redistributed_when_valuation_confidence_zero():
-    """当估值插件 confidence=0 时，权重应自动归一化到护城河插件。"""
+def test_low_confidence_weight_gap_prevents_score_inflation():
+    """低置信度因子不贡献分数，但原权重仍占分母，避免剩余因子被放大。"""
     orchestrator = MGFSOrchestrator(
         plugins=[MockMoatPluginHigh(), MockValuationPluginZeroConf()],
         scoring_weights={"moat": 0.5, "valuation": 0.3},
@@ -516,19 +685,21 @@ def test_weight_redistributed_when_valuation_confidence_zero():
     target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
     decision = orchestrator.evaluate(target)
 
-    # Adjusted weights: moat gets 100% (0.5 / 0.5), valuation gets 0%
+    # Low-confidence valuation contributes 0, but its configured weight stays in denominator.
     adjusted = decision.report_sections["adjusted_weights"]
-    assert adjusted["moat"] == 1.0
+    assert adjusted["moat"] == 0.5
     assert adjusted["valuation"] == 0.0
+    assert decision.report_sections["weight_denominator"] == 0.8
+    assert decision.report_sections["inactive_weight"] == 0.3
 
-    # raw_total should be based solely on moat: 90.0 (since moat normalized = 0.9, * 100 = 90)
-    assert decision.raw_total == 90.0
-    assert decision.final_score == 90.0
-    assert decision.rating == "Strong Buy"
+    # raw_total = 90*0.5 / (0.5+0.3) = 56.25
+    assert decision.raw_total == 56.25
+    assert decision.final_score == 56.25
+    assert decision.rating == "Avoid"
 
 
-def test_weight_redistributed_proportionally():
-    """多个高置信度插件时，被丢弃的权重按比例重新分配。"""
+def test_low_confidence_weight_gap_preserves_original_active_weights():
+    """多个高置信度插件时，低置信度权重不再按比例分配给其它插件。"""
     class PluginA(BaseFactorPlugin):
         factor_key = "a"
         factor_name = "A"
@@ -562,11 +733,13 @@ def test_weight_redistributed_proportionally():
     target = TargetInfo(symbol="TEST", market=Market.A_SHARE, asset_class="equity")
     decision = orchestrator.evaluate(target)
 
-    # c drops out; a and b re-normalize: a=0.4/0.7=~0.571, b=0.3/0.7=~0.429
+    # c drops out of numerator; a and b keep original configured weights.
     adjusted = decision.report_sections["adjusted_weights"]
-    assert pytest.approx(adjusted["a"], 0.001) == 0.4 / 0.7
-    assert pytest.approx(adjusted["b"], 0.001) == 0.3 / 0.7
+    assert adjusted["a"] == 0.4
+    assert adjusted["b"] == 0.3
     assert adjusted["c"] == 0.0
+    assert decision.report_sections["weight_denominator"] == 1.0
+    assert decision.report_sections["inactive_weight"] == 0.3
 
-    # raw_total = (0.8*100*0.571 + 0.6*100*0.429) / (0.571+0.429) = ~71.43
-    assert decision.raw_total == pytest.approx(71.43, 0.01)
+    # raw_total = (80*0.4 + 60*0.3) / (0.4+0.3+0.3) = 50.0
+    assert decision.raw_total == 50.0

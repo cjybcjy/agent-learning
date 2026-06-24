@@ -8,6 +8,7 @@ import yaml
 
 from sentinel.mgfs.data.metrics_aggregator import MetricsAggregator
 from sentinel.mgfs.factor_plugin import BaseFactorPlugin, FactorScore, TargetInfo
+from sentinel.mgfs.moat_evidence import MoatEvidenceAuditor
 
 
 class MoatFactorPlugin(BaseFactorPlugin):
@@ -32,6 +33,7 @@ class MoatFactorPlugin(BaseFactorPlugin):
         self.aggregator = aggregator
         self.fallback_score = fallback_score
         self._config: dict | None = None
+        self._evidence_auditor = MoatEvidenceAuditor()
 
     def _load_config(self) -> dict:
         if self._config is not None:
@@ -94,6 +96,7 @@ class MoatFactorPlugin(BaseFactorPlugin):
 
         # 1. Static base score
         base_cfg = company_cfg.get("base_score", {})
+        evidence_report = self._evidence_auditor.audit_base_scores(target.symbol, base_cfg)
         base_values = [
             v["score"] for v in base_cfg.values()
             if isinstance(v, dict) and "score" in v
@@ -143,8 +146,16 @@ class MoatFactorPlugin(BaseFactorPlugin):
         else:
             overall_confidence = self.FALLBACK_CONFIDENCE
         warnings: list[str] = []
-        if self.aggregator is None:
+        if self.aggregator is None or (not has_trend and not has_safety):
             warnings.append("动态指标数据缺失，仅使用静态评分")
+        elif not has_trend or not has_safety:
+            warnings.append("动态指标数据部分缺失，已按可用分段重分配权重")
+        if evidence_report.missing_count or evidence_report.invalid_count:
+            warnings.append(
+                "护城河静态评分证据字段缺失/无效: "
+                f"缺失 {evidence_report.missing_count} 项，"
+                f"无效 {evidence_report.invalid_count} 项"
+            )
 
         return FactorScore(
             factor_key=self.factor_key,
@@ -159,6 +170,9 @@ class MoatFactorPlugin(BaseFactorPlugin):
                 "trend_weight": trend_w,
                 "safety_score": round(safety_score, 2),
                 "safety_weight": safety_w,
+                "evidence_coverage": round(evidence_report.coverage, 2),
+                "evidence_missing_fields": evidence_report.missing_count,
+                "evidence_invalid_fields": evidence_report.invalid_count,
             },
             confidence=round(overall_confidence, 2),
             warnings=warnings,

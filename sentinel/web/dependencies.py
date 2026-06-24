@@ -23,9 +23,21 @@ def get_orchestrator() -> MGFSOrchestrator:
             "timing": get_price_fetcher(),
         }
         _orchestrator = build_orchestrator(
-            config, config_dir=settings.resolved_config_dir, fetchers=fetchers
+            config,
+            config_dir=settings.resolved_config_dir,
+            fetchers=fetchers,
+            plugin_kwargs=build_runtime_plugin_kwargs(settings),
         )
     return _orchestrator
+
+
+def build_runtime_plugin_kwargs(settings) -> dict:
+    from sentinel.mgfs.data.metrics_aggregator import MetricsAggregator
+    from sentinel.storage.db import Database
+
+    moat_aggregator = MetricsAggregator(Database(settings.database_path))
+    moat_aggregator.bootstrap()
+    return {"moat": {"aggregator": moat_aggregator}}
 
 
 def get_scanner() -> EcosystemScanner:

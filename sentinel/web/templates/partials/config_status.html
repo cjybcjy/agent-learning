@@ -1,8 +1,8 @@
 {% if is_valid %}
-<div class="text-green-600 text-sm font-medium">{{ message }}</div>
+<div class="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-green-700 text-sm font-bold">{{ message }}</div>
 {% else %}
-<div class="text-red-600 text-sm">
-  <div class="font-medium mb-1">校验失败</div>
-  <pre class="bg-red-50 p-2 rounded">{{ message }}</pre>
+<div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700 text-sm">
+  <div class="font-medium mb-1">Schema 校验失败</div>
+  <pre class="bg-white/60 p-2 rounded mono text-xs whitespace-pre-wrap">{{ message }}</pre>
 </div>
 {% endif %}

@@ -51,6 +51,8 @@ def test_risk_alerts_red_when_hard_stop_triggered():
         assert "MARKET_SELL" in html
         assert "确认清仓" in html
         assert "重置防线" in html
+        assert "risk-alert-actions" in html
+        assert "flex-wrap" in html
         assert "bg-red-600" in html
 
 

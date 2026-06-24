@@ -18,6 +18,8 @@ class TargetInfo:
     sector: str | None = None
     theme: str | None = None
     ecosystem_role: str | None = None
+    fund_heavy_holding_count: int | None = None
+    fund_heavy_holding_rank: int | None = None
     tags: list[str] = field(default_factory=list)
 
 

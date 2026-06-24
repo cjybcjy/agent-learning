@@ -1,14 +1,161 @@
-version: "1.0"
-description: "MGFS 产业链生态主题配置 — 热主题与生态角色溢价规则"
+version: "1.1"
+last_updated: "2026-06-18"
+description: "MGFS A股宏观主题配置 — 主题目录、政策锚、产业链角色与降温信号"
 
-# 当前处于爆发期的宏观主题
+source_refs:
+  - name: "2026年政府工作报告"
+    url: "https://www.moj.gov.cn/pub/sfbgw/zwgkztzl/2026nianzhuanti/2026qglh0206/lhjj20260206/lhjjyw20260206/202603/t20260313_532786.html"
+    signal: "新质生产力、人工智能、生物医药、机器人、量子科技、航空航天、低空经济等"
+  - name: "十五五规划纲要"
+    url: "https://www.spp.gov.cn/spp/tt/202603/t20260313_723954.shtml"
+    signal: "新一代信息技术、新能源、新材料、智能网联新能源汽车、机器人、生物医药、高端装备、航空航天"
+  - name: "国家发展改革委：2026年两新政策"
+    url: "https://www.ndrc.gov.cn/xxgk/jd/jd/202512/t20251231_1402891.html"
+    signal: "设备更新、消费品以旧换新、内需主导"
+  - name: "国家发展改革委：智能经济新形态"
+    url: "https://www.ndrc.gov.cn/wsdwhfz/202606/t20260603_1405684.html"
+    signal: "人工智能+、数字化向智能化转变"
+
+# 宏观主题目录用于 Research 页主题扫描下拉；hot_themes 只是其中较强势的一组。
+macro_themes:
+  - key: "AI_Compute_Infrastructure"
+    label: "AI 算力与智能体"
+    policy_anchor: "人工智能+ / 智能经济新形态"
+    a_share_chain: ["光模块", "服务器", "液冷", "IDC", "国产GPU", "AI应用软件"]
+    typical_roles: ["upstream_resource", "symbiotic_infra", "downstream_app"]
+    cooling_signals: ["资本开支下修", "算力租赁价格下行", "应用侧付费转化不足"]
+
+  - key: "Self_Reliant_Semiconductors"
+    label: "半导体自主可控"
+    policy_anchor: "科技自立自强 / 集成电路"
+    a_share_chain: ["设备", "材料", "EDA/IP", "封测", "功率半导体", "存储"]
+    typical_roles: ["upstream_resource", "symbiotic_infra", "core_arena"]
+    cooling_signals: ["晶圆厂扩产放缓", "国产替代验证失败", "库存周期反转"]
+
+  - key: "Embodied_Robotics"
+    label: "机器人与具身智能"
+    policy_anchor: "未来产业 / 机器人 / 具身智能"
+    a_share_chain: ["减速器", "伺服系统", "传感器", "执行器", "工业机器人", "人形机器人整机"]
+    typical_roles: ["upstream_resource", "core_arena", "downstream_app"]
+    cooling_signals: ["量产节奏推迟", "BOM降本不达预期", "订单仍停留在样机阶段"]
+
+  - key: "Low_Altitude_Economy"
+    label: "低空经济"
+    policy_anchor: "新兴支柱产业 / 低空经济"
+    a_share_chain: ["eVTOL", "无人机", "空管系统", "通航机场", "复合材料", "运营服务"]
+    typical_roles: ["symbiotic_infra", "upstream_resource", "downstream_app"]
+    cooling_signals: ["适航认证推迟", "地方补贴退坡", "商业场景利用率不足"]
+
+  - key: "Commercial_Aerospace_Satellite"
+    label: "商业航天与卫星互联网"
+    policy_anchor: "航空航天 / 商业航天 / 空间信息"
+    a_share_chain: ["卫星制造", "火箭发射", "遥感数据", "卫星通信", "北斗应用"]
+    typical_roles: ["upstream_resource", "symbiotic_infra", "downstream_app"]
+    cooling_signals: ["发射排期延后", "组网进度不及预期", "终端渗透率不足"]
+
+  - key: "New_Energy_Storage_Hydrogen"
+    label: "新型电力系统与储能氢能"
+    policy_anchor: "未来能源 / 绿色低碳转型"
+    a_share_chain: ["电网设备", "储能", "氢能", "逆变器", "虚拟电厂", "新能源运营"]
+    typical_roles: ["symbiotic_infra", "upstream_resource", "downstream_app"]
+    cooling_signals: ["装机并网消纳受限", "储能价格战恶化", "电价机制低于预期"]
+
+  - key: "New_Energy_Materials"
+    label: "新能源金属与材料"
+    policy_anchor: "新能源 / 新材料"
+    a_share_chain: ["锂", "铜", "稀土", "正负极材料", "隔膜", "电解液"]
+    typical_roles: ["upstream_resource", "core_arena"]
+    cooling_signals: ["金属价格单边下行", "供给释放过快", "下游电池排产下修"]
+
+  - key: "Intelligent_EV_Autonomous_Driving"
+    label: "智能电动车与自动驾驶"
+    policy_anchor: "智能网联新能源汽车"
+    a_share_chain: ["整车", "电池", "域控", "激光雷达", "线控制动", "充电设施"]
+    typical_roles: ["core_arena", "upstream_resource", "symbiotic_infra"]
+    cooling_signals: ["价格战扩大", "智能驾驶事故约束", "终端销量低于预期"]
+
+  - key: "Advanced_Manufacturing"
+    label: "设备更新与高端制造"
+    policy_anchor: "大规模设备更新 / 高端装备 / 智改数转"
+    a_share_chain: ["工业母机", "自动化设备", "检测设备", "工程机械", "服务型制造"]
+    typical_roles: ["upstream_resource", "symbiotic_infra", "core_arena"]
+    cooling_signals: ["制造业PMI走弱", "设备更新补贴落地慢", "出口订单下滑"]
+
+  - key: "Digital_China_Data_Elements"
+    label: "数字中国与数据要素"
+    policy_anchor: "数字经济核心产业 / 数据要素 / 信创"
+    a_share_chain: ["基础软件", "工业软件", "数据运营", "云计算", "网络安全", "政企信创"]
+    typical_roles: ["symbiotic_infra", "downstream_app"]
+    cooling_signals: ["政企IT预算收缩", "数据交易活跃度不足", "订单回款周期拉长"]
+
+  - key: "Consumer_Stimulus_Upgrade"
+    label: "扩内需与消费升级"
+    policy_anchor: "提振消费 / 消费品以旧换新"
+    a_share_chain: ["家电", "汽车后市场", "食品饮料", "旅游", "免税", "服务消费"]
+    typical_roles: ["downstream_app", "core_arena"]
+    cooling_signals: ["社零增速放缓", "补贴退坡", "高端消费价格带下移"]
+
+  - key: "Silver_Economy_Healthcare"
+    label: "银发经济与医疗健康"
+    policy_anchor: "养老服务 / 生物医药 / 医疗器械"
+    a_share_chain: ["创新药", "医疗器械", "CXO", "康复护理", "养老服务", "AI医疗"]
+    typical_roles: ["symbiotic_infra", "downstream_app", "core_arena"]
+    cooling_signals: ["医保控费超预期", "集采降价扩大", "院内采购恢复慢"]
+
+  - key: "SOE_Reform_High_Dividend"
+    label: "国企改革与高股息红利"
+    policy_anchor: "国企改革深化 / 资本市场稳定"
+    a_share_chain: ["电力", "运营商", "石油石化", "煤炭", "银行", "交通运输"]
+    typical_roles: ["symbiotic_infra", "upstream_resource"]
+    cooling_signals: ["分红承诺弱化", "利率上行压制估值", "周期品盈利下修"]
+
+  - key: "Food_Security_Seed_Industry"
+    label: "粮食安全与种业振兴"
+    policy_anchor: "粮食安全 / 种业振兴 / 智慧农业"
+    a_share_chain: ["种业", "农化", "农机", "养殖", "粮油加工", "智慧农业"]
+    typical_roles: ["upstream_resource", "downstream_app"]
+    cooling_signals: ["农产品价格下行", "养殖周期恶化", "转基因商业化节奏放慢"]
+
+  - key: "Financial_Stability_High_Dividend"
+    label: "金融稳定与红利资产"
+    policy_anchor: "稳增长 / 防风险 / 长期资金入市"
+    a_share_chain: ["银行", "保险", "券商", "交易所基础设施", "财富管理"]
+    typical_roles: ["symbiotic_infra"]
+    cooling_signals: ["息差继续下行", "资产质量恶化", "资本市场成交收缩"]
+
+  - key: "Belt_Road_Globalization"
+    label: "一带一路与出海链"
+    policy_anchor: "外贸多元化 / 产业链全球化"
+    a_share_chain: ["工程机械", "电力设备", "家电出海", "汽车零部件", "港口航运"]
+    typical_roles: ["upstream_resource", "downstream_app", "symbiotic_infra"]
+    cooling_signals: ["海外贸易摩擦升级", "汇率大幅波动", "海外渠道库存累积"]
+
+# 当前更值得给生态角色溢价的主题；广义防御主题不全放入 hot_themes。
 hot_themes:
   - "AI_Compute_Infrastructure"
-  - "New_Energy_Materials"
+  - "Self_Reliant_Semiconductors"
+  - "Embodied_Robotics"
+  - "Low_Altitude_Economy"
+  - "Commercial_Aerospace_Satellite"
+  - "New_Energy_Storage_Hydrogen"
+  - "Intelligent_EV_Autonomous_Driving"
+  - "Advanced_Manufacturing"
+  - "Digital_China_Data_Elements"
+
+negative_watchlist:
+  - key: "Theme_Without_Earnings"
+    label: "无业绩兑现的纯概念炒作"
+    signal: "主题上涨但订单、收入、毛利没有同步改善"
+  - key: "Overcapacity_Price_War"
+    label: "产能过剩与价格战"
+    signal: "供给扩张快于需求，行业毛利率连续下行"
+  - key: "Policy_Pull_Forward"
+    label: "政策补贴透支需求"
+    signal: "补贴拉动后需求断档，渠道库存回升"
 
 # 生态角色溢价规则
 role_premiums:
-  symbiotic_infra: 0.10   # +10% 确定性溢价
-  upstream_resource: 0.0
-  downstream_app: 0.0
-  core_arena: -0.05       # 核心绞肉机，风险折价
+  symbiotic_infra: 0.10
+  upstream_resource: 0.04
+  downstream_app: 0.02
+  core_arena: -0.05

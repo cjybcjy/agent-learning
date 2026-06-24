@@ -25,17 +25,18 @@
 </script>
 
 <div class="overflow-x-auto">
-  <table class="w-full text-sm">
+  <table class="terminal-table">
     <thead>
-      <tr class="bg-gray-100 text-left">
-        <th class="p-2">代码</th>
-        <th class="p-2">名称</th>
-        <th class="p-2">角色</th>
-        <th class="p-2">护城河</th>
-        <th class="p-2">估值</th>
-        <th class="p-2">最终得分</th>
-        <th class="p-2">评级</th>
-        <th class="p-2">建议</th>
+      <tr>
+        <th>代码</th>
+        <th>名称</th>
+        <th>角色</th>
+        <th>重仓基金</th>
+        <th>护城河</th>
+        <th>估值</th>
+        <th>最终得分</th>
+        <th>评级</th>
+        <th>建议</th>
       </tr>
     </thead>
     <tbody>
@@ -45,29 +46,44 @@
       {% set moat = r.factor_scores.get("moat") %}
       {% set val = r.factor_scores.get("valuation") %}
       {% set zone = val.details.get("zone", "") if val else "" %}
-      {% set zone_emojis = {"strong_buy": "🟢", "accumulate": "🔵", "hold": "🟡", "avoid": "🔴"} %}
-      <tr class="border-b hover:bg-gray-50">
-        <td class="p-2 font-mono">{{ r.target.symbol }}</td>
-        <td class="p-2">{{ r.target.name or "—" }}</td>
-        <td class="p-2">{{ role_labels.get(r.target.ecosystem_role, r.target.ecosystem_role or "—") }}</td>
-        <td class="p-2">{{ "%.1f"|format(moat.score) if moat else "—" }}</td>
-        <td class="p-2">{{ zone_emojis.get(zone, "⚪") }} {{ zone }}</td>
-        <td class="p-2 font-bold">{{ "%.2f"|format(r.final_score) }}</td>
-        <td class="p-2">{{ r.rating }}</td>
-        <td class="p-2 text-xs">{{ r.action }}</td>
+      {% set zone_labels = {"strong_buy": "Strong Buy", "accumulate": "Accumulate", "hold": "Hold", "avoid": "Avoid"} %}
+      <tr>
+        <td class="mono font-bold">{{ r.target.symbol }}</td>
+        <td>{{ r.target.name or "—" }}</td>
+        <td>{{ role_labels.get(r.target.ecosystem_role, r.target.ecosystem_role or "—") }}</td>
+        <td class="mono">
+          {% if r.target.fund_heavy_holding_count is not none %}
+          {{ r.target.fund_heavy_holding_count }}{% if r.target.fund_heavy_holding_rank %}<span class="text-slate-400"> / #{{ r.target.fund_heavy_holding_rank }}</span>{% endif %}
+          {% else %}
+          —
+          {% endif %}
+        </td>
+        <td class="mono">{{ "%.1f"|format(moat.score) if moat else "—" }}</td>
+        <td>{{ zone_labels.get(zone, zone or "—") }}</td>
+        <td class="mono font-bold">{{ "%.2f"|format(r.final_score) }}</td>
+        <td>{{ r.rating }}</td>
+        <td class="text-xs text-slate-600">{{ r.action }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 {% else %}
-<div class="text-gray-500 text-sm">没有标的通过筛选。</div>
+<div class="empty-state min-h-[120px]">
+  <div>
+    <i data-lucide="list-filter" class="w-7 h-7 mx-auto mb-2 text-slate-400"></i>
+    <div class="font-semibold text-slate-600">没有标的通过筛选</div>
+  </div>
+</div>
 {% endif %}
 
 {% if summary %}
-<div class="mt-3 text-xs text-gray-500">
-  {% if summary.get("skipped_by_veto") %}<span>{{ summary["skipped_by_veto"] }} 只触发熔断被剔除</span>{% endif %}
-  {% if summary.get("skipped_by_zone") %}<span class="ml-3">{{ summary["skipped_by_zone"] }} 只估值不在击球区</span>{% endif %}
-  {% if summary.get("skipped_by_moat") %}<span class="ml-3">{{ summary["skipped_by_moat"] }} 只护城河不足</span>{% endif %}
+<div class="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+  {% if summary.get("total_candidates") is not none %}<span class="status-chip">候选池 {{ summary["total_candidates"] }} 只</span>{% endif %}
+  {% if summary.get("evaluated") is not none %}<span class="status-chip">实际评估 {{ summary["evaluated"] }} 只</span>{% endif %}
+  {% if summary.get("skipped_by_veto") %}<span class="status-chip">{{ summary["skipped_by_veto"] }} 只触发熔断</span>{% endif %}
+  {% if summary.get("skipped_by_zone") %}<span class="status-chip">{{ summary["skipped_by_zone"] }} 只不在击球区</span>{% endif %}
+  {% if summary.get("skipped_by_moat") %}<span class="status-chip">{{ summary["skipped_by_moat"] }} 只护城河不足</span>{% endif %}
+  {% if summary.get("skipped_by_fund_rank") %}<span class="status-chip">{{ summary["skipped_by_fund_rank"] }} 只未进入基金重仓 Top {{ summary["fund_rank_limit"] }}</span>{% endif %}
 </div>
 {% endif %}

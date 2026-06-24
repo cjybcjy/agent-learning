@@ -46,17 +46,31 @@ def get_task(task_id: str) -> ScanTask | None:
     return _tasks.get(task_id)
 
 
-def run_scan_task(task_id: str, theme: str, target_roles: list[str] | None, policy_rating: str):
+def run_scan_task(
+    task_id: str,
+    theme: str,
+    target_roles: list[str] | None,
+    policy_rating: str,
+    fund_rank_limit: int | None = None,
+):
     task = _tasks.get(task_id)
     if task is None:
         return
-    task.status = ScanTaskStatus.RUNNING
     try:
         scanner = get_scanner()
+        preview = scanner.preview_theme(
+            theme_name=theme,
+            target_roles=target_roles,
+            fund_rank_limit=fund_rank_limit,
+        )
+        task.total = int(preview.get("total_candidates") or 0)
+        task.summary = preview
+        task.status = ScanTaskStatus.RUNNING
         result = scanner.scan_theme(
             theme_name=theme,
             target_roles=target_roles,
             policy_rating=policy_rating,
+            fund_rank_limit=fund_rank_limit,
         )
         task.total = result.total_candidates
         task.completed = result.filtered_count

@@ -10,6 +10,7 @@ import pytest
 from sentinel.mgfs.orchestrator import InvestmentDecision
 from sentinel.mgfs.factor_plugin import FactorScore, TargetInfo
 from sentinel.mgfs.storage.mgfs_repository import MGFSRepository
+from sentinel.config import AppSettings
 from sentinel.storage.db import Database
 from sentinel.web.services.pipeline_service import PipelineService
 
@@ -65,6 +66,36 @@ class TestPipelineServiceTrigger:
 
         batch = repo.get_pipeline_batch(batch_id)
         assert batch["status"] == "completed"
+
+    def test_load_stock_pool_preserves_moat_metadata(self, tmp_path, monkeypatch) -> None:
+        config_dir = tmp_path / "config"
+        data_dir = tmp_path / "data"
+        config_dir.mkdir()
+        data_dir.mkdir()
+        (config_dir / "moat_static_base.yaml").write_text(
+            """
+companies:
+  "600519":
+    name: "贵州茅台"
+    sector: "白酒"
+    theme: "Consumer_Staples"
+    ecosystem_role: "downstream_app"
+    base_score: {}
+""",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            "sentinel.web.services.pipeline_service.settings",
+            AppSettings(base_dir=tmp_path, config_dir=config_dir, data_dir=data_dir),
+        )
+
+        targets = PipelineService(orchestrator=MagicMock(), repository=MagicMock())._load_stock_pool()
+
+        assert len(targets) == 1
+        assert targets[0].name == "贵州茅台"
+        assert targets[0].sector == "白酒"
+        assert targets[0].theme == "Consumer_Staples"
+        assert targets[0].ecosystem_role == "downstream_app"
 
 
 class TestPipelineServiceExecute:
@@ -150,6 +181,48 @@ class TestPipelineServiceExport:
         csv_content = svc.export_csv("B_20260518_120000")
         assert "symbol" in csv_content  # header present
         assert "600519" not in csv_content
+
+
+class TestPipelineServiceResults:
+    def test_get_pipeline_results_enriches_symbol_only_names(
+        self, repo: MGFSRepository, tmp_path, monkeypatch
+    ) -> None:
+        config_dir = tmp_path / "config"
+        data_dir = tmp_path / "data"
+        config_dir.mkdir()
+        data_dir.mkdir()
+        (config_dir / "moat_static_base.yaml").write_text(
+            """
+companies:
+  "600519":
+    name: "贵州茅台"
+    base_score: {}
+""",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            "sentinel.web.services.pipeline_service.settings",
+            AppSettings(base_dir=tmp_path, config_dir=config_dir, data_dir=data_dir),
+        )
+
+        repo.create_pipeline_batch("B_20260518_120000", "completed")
+        repo.save_pipeline_result(
+            batch_id="B_20260518_120000",
+            symbol="600519",
+            name="600519",
+            moat_score=80.5,
+            valuation_percentile=15.2,
+            timing_score=45.0,
+            final_score=75.3,
+            rating="Accumulate",
+            action="分批建仓",
+        )
+
+        rows = PipelineService(orchestrator=MagicMock(), repository=repo).get_pipeline_results(
+            "B_20260518_120000"
+        )
+
+        assert rows[0]["name"] == "贵州茅台"
 
 
 class TestPipelineServiceHistory:

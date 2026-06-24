@@ -9,12 +9,16 @@ __pycache__/
 *.pyc
 *.egg-info/
 .eggs/
+.pytest_cache/
 
 # DuckDB
 data/*.duckdb
+data/research_agent_runs.json
+data/research_external_signals.json
 
 # Environments
 .venv/
+.venv-tradingagents/
 .env
 
 # IDE
@@ -23,3 +27,6 @@ data/*.duckdb
 
 # OS
 .DS_Store
+
+# Superpowers visual brainstorming artifacts
+.superpowers/

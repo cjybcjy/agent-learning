@@ -6,6 +6,7 @@ from typing import Any
 from sentinel.mgfs.archetype_router import ArchetypeRouter
 from sentinel.mgfs.data.price_fetcher import MockPriceFetcher, OHLCV, PriceFetcher
 from sentinel.mgfs.factor_plugin import BaseFactorPlugin, FactorScore, TargetInfo
+from sentinel.mgfs.technical_strategy import AShareTechnicalStrategy
 
 
 class TimingFactorPlugin(BaseFactorPlugin):
@@ -32,6 +33,11 @@ class TimingFactorPlugin(BaseFactorPlugin):
     DEFAULT_ATR_K = 1.0
     DEFAULT_ATR_MIN_MULT = 0.5
     DEFAULT_ATR_MAX_MULT = 2.0
+    DEFAULT_LOOKBACK_DAYS = 520
+    MIN_MA_DAYS = 60
+    SHORT_SAMPLE_DAYS = 80
+    ONE_YEAR_DAYS = 250
+    TWO_YEAR_DAYS = 500
 
     def __init__(
         self,
@@ -64,17 +70,34 @@ class TimingFactorPlugin(BaseFactorPlugin):
 
     def evaluate(self, target: TargetInfo) -> FactorScore:
         # 1. Fetch price history
-        ohlcv = self._fetcher.fetch_ohlcv(target.symbol, target.market, days=120)
+        requested_days = self.DEFAULT_LOOKBACK_DAYS
+        ohlcv = self._fetcher.fetch_ohlcv(
+            target.symbol,
+            target.market,
+            days=requested_days,
+        )
+        sample_size = len(ohlcv)
+        confidence, confidence_tier = self._classify_sample_confidence(sample_size)
+        base_details: dict[str, Any] = {
+            "requested_days": requested_days,
+            "sample_size": sample_size,
+            "confidence_tier": confidence_tier,
+        }
+        sample_warnings = self._sample_warnings(sample_size, requested_days)
 
         # 1.5 Insufficient data guard (< 60 trading days)
-        if len(ohlcv) < 60:
+        if sample_size < self.MIN_MA_DAYS:
             return FactorScore(
                 factor_key=self.factor_key,
                 factor_name=self.factor_name,
                 score=50.0,
                 weight=self.default_weight,
                 confidence=0.0,
-                warnings=[f"K线数据不足 ({len(ohlcv)} 根)，无法计算 60 日均线"],
+                details=base_details,
+                warnings=[
+                    f"K线数据不足 ({sample_size} 根)，无法计算 60 日均线",
+                    *sample_warnings,
+                ],
             )
 
         closes = [bar.close for bar in ohlcv]
@@ -92,8 +115,9 @@ class TimingFactorPlugin(BaseFactorPlugin):
                 factor_name=self.factor_name,
                 score=50.0,
                 weight=self.default_weight,
+                details=base_details,
                 confidence=0.3,
-                warnings=[freeze_msg],
+                warnings=[freeze_msg, *sample_warnings],
             )
 
         # 4. Compute 60-day MA trend slope (20-day delta)
@@ -126,25 +150,17 @@ class TimingFactorPlugin(BaseFactorPlugin):
             atr_ratio=atr_ratio,
             timing_cfg=timing_cfg,
         )
-
-        # 8. Confidence
-        data_quality = len(ohlcv)
-        if data_quality >= 500:
-            confidence = 0.85
-        elif data_quality >= 250:
-            confidence = 0.75
-        elif data_quality >= 80:
-            confidence = 0.65
-        else:
-            confidence = 0.3  # 60-79 days: MA60 ok, slope less reliable
+        technical_signal = AShareTechnicalStrategy().analyze(ohlcv).latest.to_details()
 
         details: dict[str, Any] = {
+            **base_details,
             "ma60": round(ma60, 2),
             "bias": round(bias, 4),
             "trend_slope": round(trend_slope, 4),
             "atr14": round(atr, 2),
             "atr_ratio": round(atr_ratio, 4),
             "archetype": archetype.get("label") if archetype else None,
+            "technical_signal": technical_signal,
         }
 
         return FactorScore(
@@ -154,8 +170,28 @@ class TimingFactorPlugin(BaseFactorPlugin):
             weight=self.default_weight,
             details=details,
             confidence=round(confidence, 2),
-            warnings=warnings,
+            warnings=[*warnings, *sample_warnings],
         )
+
+    def _classify_sample_confidence(self, sample_size: int) -> tuple[float, str]:
+        if sample_size >= self.TWO_YEAR_DAYS:
+            return 0.85, "two_year"
+        if sample_size >= self.ONE_YEAR_DAYS:
+            return 0.75, "one_year"
+        if sample_size >= self.SHORT_SAMPLE_DAYS:
+            return 0.65, "short_sample"
+        if sample_size >= self.MIN_MA_DAYS:
+            return 0.3, "ma60_only"
+        return 0.0, "insufficient"
+
+    @staticmethod
+    def _sample_warnings(sample_size: int, requested_days: int) -> list[str]:
+        if sample_size >= requested_days:
+            return []
+        return [
+            f"样本窗口未达请求: {sample_size}/{requested_days} 根K线，"
+            "择时置信度按实际样本降级"
+        ]
 
     @staticmethod
     def _compute_atr(ohlcv: list[OHLCV], period: int = 14) -> float:

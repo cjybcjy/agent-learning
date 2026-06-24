@@ -1,0 +1,71 @@
+version: "1.0"
+last_updated: "2026-05-15"
+
+modules:
+  moat:
+    enabled: true
+    class_path: "sentinel.mgfs.plugins.moat.MoatFactorPlugin"
+    config: {}
+  policy:
+    enabled: true
+    class_path: "sentinel.mgfs.plugins.policy.PolicyFactorPlugin"
+    config: {}
+  valuation:
+    enabled: true
+    class_path: "sentinel.mgfs.plugins.valuation.ValuationFactorPlugin"
+    config: {}
+  timing:
+    enabled: true
+    class_path: "sentinel.mgfs.plugins.timing.TimingFactorPlugin"
+    config: {}
+
+scoring_formula:
+  moat: { weight: 0.5 }
+  valuation: { weight: 0.3 }
+  policy: { weight: 0.0 }
+  timing: { weight: 0.1 }
+
+policy_multiplier:
+  core_support: { multiplier: 1.2 }
+  neutral: { multiplier: 1.0 }
+  transition: { multiplier: 0.8 }
+  restricted: { multiplier: 0.5 }
+
+circuit_breakers:
+  extreme_overvaluation:
+    enabled: true
+    rule: "valuation_primary_percentile > 90"
+    alert_level: "hard_veto"
+    message: "估值处于历史极端高位，一票否决"
+  overvalued_shallow_moat:
+    enabled: true
+    rule: "valuation_primary_percentile > 70 and moat_score < 60"
+    alert_level: "soft_veto"
+    message: "估值偏高且护城河较浅，建议回避"
+  min_moat:
+    enabled: true
+    rule: "moat_score < 30"
+    alert_level: "soft_veto"
+    message: "护城河评分过低"
+
+rating_thresholds:
+  strong_buy:
+    min_score: 90.0
+    label: "Strong Buy"
+    action: "重仓出击"
+    min_overall_confidence: 0.8
+    required_factors:
+      moat:
+        min_score: 80.0
+        min_confidence: 0.8
+        details:
+          evidence_coverage: { min: 0.8 }
+      valuation:
+        min_confidence: 0.7
+        details:
+          zone: { in: ["strong_buy"] }
+      timing:
+        min_confidence: 0.5
+  accumulate: { min_score: 75.0, label: "Accumulate", action: "分批建仓" }
+  hold_watch: { min_score: 60.0, label: "Hold/Watch", action: "等待拐点" }
+  avoid: { min_score: 0.0, label: "Avoid", action: "回避" }

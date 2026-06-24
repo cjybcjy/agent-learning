@@ -155,6 +155,112 @@ def test_scanner_skips_veto_and_low_moat(tmp_path: Path) -> None:
     assert result.summary["passed_all_gates"] == 1
 
 
+def test_scanner_filters_by_heavy_fund_count_rank(tmp_path: Path) -> None:
+    config_path = tmp_path / "moat.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "companies": {
+                    "TOP1": {
+                        "name": "Top Fund Favorite",
+                        "sector": "Tech",
+                        "theme": "AI",
+                        "ecosystem_role": "upstream_resource",
+                        "fund_heavy_holding_count": 35,
+                    },
+                    "TOP2": {
+                        "name": "Second Favorite",
+                        "sector": "Tech",
+                        "theme": "AI",
+                        "ecosystem_role": "upstream_resource",
+                        "fund_heavy_holding_count": 20,
+                    },
+                    "TAIL": {
+                        "name": "Tail Holding",
+                        "sector": "Tech",
+                        "theme": "AI",
+                        "ecosystem_role": "upstream_resource",
+                        "fund_heavy_holding_count": 5,
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    orchestrator = MagicMock()
+
+    def mock_evaluate(target: TargetInfo, **kwargs: object) -> InvestmentDecision:
+        return _make_decision(target, final_score=80.0)
+
+    orchestrator.evaluate = mock_evaluate
+
+    scanner = EcosystemScanner(
+        orchestrator=orchestrator,
+        moat_config_path=config_path,
+    )
+    result = scanner.scan_theme(theme_name="AI", fund_rank_limit=2)
+
+    assert [report.target.symbol for report in result.reports] == ["TOP1", "TOP2"]
+    assert [report.target.fund_heavy_holding_rank for report in result.reports] == [1, 2]
+    assert result.reports[0].target.fund_heavy_holding_count == 35
+    assert result.summary["fund_rank_limit"] == 2
+    assert result.summary["skipped_by_fund_rank"] == 1
+    assert result.summary["evaluated"] == 2
+
+
+def test_scanner_preview_counts_candidates_without_evaluation(tmp_path: Path) -> None:
+    config_path = tmp_path / "moat.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "companies": {
+                    "TOP1": {
+                        "name": "Top Fund Favorite",
+                        "sector": "Tech",
+                        "theme": "AI",
+                        "ecosystem_role": "upstream_resource",
+                        "fund_heavy_holding_count": 35,
+                    },
+                    "TOP2": {
+                        "name": "Second Favorite",
+                        "sector": "Tech",
+                        "theme": "AI",
+                        "ecosystem_role": "upstream_resource",
+                        "fund_heavy_holding_count": 20,
+                    },
+                    "APP": {
+                        "name": "Downstream App",
+                        "sector": "Tech",
+                        "theme": "AI",
+                        "ecosystem_role": "downstream_app",
+                        "fund_heavy_holding_count": 5,
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    orchestrator = MagicMock()
+    scanner = EcosystemScanner(
+        orchestrator=orchestrator,
+        moat_config_path=config_path,
+    )
+
+    summary = scanner.preview_theme(
+        theme_name="AI",
+        target_roles=["upstream_resource"],
+        fund_rank_limit=1,
+    )
+
+    assert summary["total_candidates"] == 3
+    assert summary["evaluated"] == 1
+    assert summary["skipped_by_role"] == 1
+    assert summary["skipped_by_fund_rank"] == 1
+    orchestrator.evaluate.assert_not_called()
+
+
 def test_build_ecosystem_report_generates_card():
     from sentinel.publishers.mgfs_report import build_ecosystem_scan_report
     from sentinel.mgfs.scanner import ScanResult

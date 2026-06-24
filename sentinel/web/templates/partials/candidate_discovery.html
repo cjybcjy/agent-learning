@@ -1,0 +1,87 @@
+<section class="mt-4 rounded-md border border-slate-700 bg-slate-900/40 p-4">
+  <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+    <div>
+      <div class="text-sm font-bold text-blue-100">客观候选发现 · {{ result.theme_label }}</div>
+      <div class="text-xs text-slate-400 mt-1">
+        从东方财富概念/行业板块成分股反推候选，只读输出，不自动写入配置
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="status-chip">匹配板块 {{ result.matched_board_count }}</span>
+      <span class="status-chip">候选 {{ result.candidates|length }}</span>
+      <span class="status-chip">概念源 {{ result.source_mix.get("concept", 0) }}</span>
+      <span class="status-chip">行业源 {{ result.source_mix.get("industry", 0) }}</span>
+    </div>
+  </div>
+
+  {% if result.search_terms %}
+  <div class="mb-3 flex flex-wrap gap-2 text-xs text-slate-300">
+    {% for term in result.search_terms[:12] %}
+    <span class="status-chip info">{{ term }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if result.warnings %}
+  <div class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+    {% for warning in result.warnings %}
+    <div>{{ warning }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if result.candidates %}
+  <div class="overflow-x-auto">
+    <table class="terminal-table">
+      <thead>
+        <tr>
+          <th>代码</th>
+          <th>名称</th>
+          <th>证据数</th>
+          <th>静态池</th>
+          <th>重仓基金</th>
+          <th>客观来源</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for candidate in result.candidates %}
+        <tr>
+          <td class="mono font-bold">{{ candidate.symbol }}</td>
+          <td>{{ candidate.name }}</td>
+          <td class="mono">{{ candidate.evidence_count }}</td>
+          <td>
+            {% if candidate.in_static_pool %}
+            <span class="status-chip info">已入池{% if candidate.static_theme %}: {{ candidate.static_theme }}{% endif %}</span>
+            {% else %}
+            <span class="status-chip warn">待复核</span>
+            {% endif %}
+          </td>
+          <td class="mono">
+            {% if candidate.fund_heavy_holding_count is not none %}
+            {{ candidate.fund_heavy_holding_count }}
+            {% else %}
+            —
+            {% endif %}
+          </td>
+          <td class="text-xs text-slate-600">
+            {% for evidence in candidate.evidence[:4] %}
+            <span class="status-chip">
+              {{ source_labels.get(evidence.source, evidence.source) }}: {{ evidence.board_name }}
+            </span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state min-h-[120px]">
+    <div>
+      <i data-lucide="list-filter" class="w-7 h-7 mx-auto mb-2 text-slate-400"></i>
+      <div class="font-semibold text-slate-600">没有发现可用候选</div>
+      <div class="mt-1 text-xs text-slate-500">可以检查主题关键词或外部板块数据源状态</div>
+    </div>
+  </div>
+  {% endif %}
+</section>

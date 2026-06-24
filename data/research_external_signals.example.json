@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-06-23T08:00:00",
+  "items": [
+    {
+      "category": "policy",
+      "source": "国务院政策例行吹风会",
+      "title": "人工智能+行动持续推进",
+      "published_at": "2026-06-22",
+      "sectors": ["人工智能"],
+      "themes": ["AI_Compute_Infrastructure"],
+      "url": "https://example.com/policy-ai",
+      "polarity": "supporting",
+      "impact": "高"
+    },
+    {
+      "category": "moat",
+      "source": "交易所公告",
+      "title": "宁德时代海外订单结构变化",
+      "published_at": "2026-06-21",
+      "symbols": ["300750"],
+      "url": "https://example.com/300750",
+      "polarity": "counter",
+      "impact": "中"
+    }
+  ]
+}

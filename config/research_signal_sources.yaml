@@ -1,0 +1,68 @@
+version: "1.0"
+last_updated: "2026-06-23"
+description: "每日研究 Agent 外部信号采集源；采集结果写入 data/research_external_signals.json"
+
+sources:
+  - key: "gov_cn_policy_pushinfo"
+    enabled: true
+    kind: "json"
+    category: "policy"
+    name: "中国政府网政策推送"
+    url: "https://www.gov.cn/pushinfo/v150203/pushinfo.json"
+    items_path: ""
+    require_keyword_match: true
+    fields:
+      title: "title"
+      url: "link"
+      published_at: "pubDate"
+    keyword_rules:
+      - contains: ["人工智能", "智能经济", "数字经济", "算力"]
+        sectors: ["人工智能", "云计算", "软件服务"]
+        themes: ["AI_Compute_Infrastructure", "Digital_China_Data_Elements"]
+        impact: "高"
+      - contains: ["集成电路", "半导体", "芯片", "科技自立"]
+        sectors: ["半导体", "电子"]
+        themes: ["Self_Reliant_Semiconductors"]
+        impact: "高"
+      - contains: ["机器人", "具身智能", "高端装备", "智能制造"]
+        sectors: ["人工智能", "家用电器"]
+        themes: ["Embodied_Robotics", "Advanced_Manufacturing"]
+        impact: "高"
+      - contains: ["低空经济", "无人机", "航空航天", "商业航天", "卫星"]
+        sectors: ["电子", "人工智能"]
+        themes: ["Low_Altitude_Economy", "Commercial_Aerospace_Satellite"]
+        impact: "高"
+      - contains: ["新能源", "储能", "氢能", "绿色低碳", "电力系统"]
+        sectors: ["新能源汽车", "有色金属", "化工"]
+        themes: ["New_Energy_Storage_Hydrogen", "New_Energy_Materials"]
+        impact: "中"
+      - contains: ["消费品以旧换新", "提振消费", "扩内需"]
+        sectors: ["家用电器", "食品饮料"]
+        themes: ["Consumer_Stimulus_Upgrade"]
+        impact: "中"
+      - contains: ["农业农村现代化", "粮食安全", "种业", "智慧农业"]
+        sectors: ["农林牧渔", "食品饮料"]
+        themes: ["Food_Security_Seed_Industry"]
+        impact: "中"
+      - contains: ["矿产资源", "矿产", "关键矿产", "资源安全"]
+        sectors: ["有色金属", "煤炭"]
+        themes: ["New_Energy_Materials"]
+        impact: "中"
+      - contains: ["私募投资基金", "长期资金", "资本市场", "金融稳定"]
+        sectors: ["银行", "保险"]
+        themes: ["Financial_Stability_High_Dividend"]
+        impact: "中"
+
+  - key: "cninfo_announcements_template"
+    enabled: false
+    kind: "json"
+    category: "moat"
+    name: "巨潮资讯公告"
+    url: "https://www.cninfo.com.cn/new/hisAnnouncement/query"
+    note: "模板源。巨潮公告需要 POST 参数适配，启用前需补充请求方法和参数。"
+    items_path: "announcements"
+    fields:
+      title: "announcementTitle"
+      url: "pdfUrl"
+      published_at: "announcementTime"
+      symbol: "secCode"

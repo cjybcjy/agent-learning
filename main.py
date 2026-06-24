@@ -105,6 +105,7 @@ def scan(
     from sentinel.mgfs.config_loader import load_mgfs_config, build_orchestrator
     from sentinel.mgfs.scanner import EcosystemScanner
     from sentinel.mgfs.data import get_price_fetcher
+    from sentinel.mgfs.data.eastmoney_fetcher import EastmoneyValuationFetcher
 
     settings = AppSettings()
     config_dir = settings.resolved_config_dir

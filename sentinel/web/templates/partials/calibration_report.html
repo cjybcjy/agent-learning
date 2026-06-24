@@ -1,53 +1,61 @@
-<div class="bg-white rounded-lg shadow p-6 mb-6">
-  <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-    <i data-lucide="brain-circuit" class="w-5 h-5 text-purple-600"></i>
-    MGFS 2.0 贝叶斯校准报告
-    <span class="text-xs text-gray-400 font-normal">{{ start_date }} → {{ end_date }}</span>
-  </h2>
-
-  {% if reports %}
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="bg-gray-100 text-left">
-          <th class="p-2">排名</th>
-          <th class="p-2">标的</th>
-          <th class="p-2">静态分</th>
-          <th class="p-2">建议分</th>
-          <th class="p-2">偏见惩罚</th>
-          <th class="p-2">置信度</th>
-          <th class="p-2">原因</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in reports %}
-        {% set penalty_color = "text-red-600" if r.bias_penalty < -5 else ("text-orange-500" if r.bias_penalty < -1 else "text-green-600") %}
-        {% set penalty_bg = "bg-red-50" if r.bias_penalty < -5 else ("bg-orange-50" if r.bias_penalty < -1 else "bg-green-50") %}
-        <tr class="border-b hover:bg-gray-50 {{ penalty_bg }}">
-          <td class="p-2 font-mono text-xs text-gray-500">{{ loop.index }}</td>
-          <td class="p-2 font-bold">{{ r.name }} ({{ r.symbol }})</td>
-          <td class="p-2 font-mono">{{ "%.1f"|format(r.static_score) }}</td>
-          <td class="p-2 font-mono font-bold">
-            {% if r.suggested_score is not none %}
-              {{ "%.1f"|format(r.suggested_score) }}
-            {% else %}
-              <span class="text-gray-400">N/A</span>
-            {% endif %}
-          </td>
-          <td class="p-2 font-mono font-bold {{ penalty_color }}">
-            {{ "%.2f"|format(r.bias_penalty) }}
-          </td>
-          <td class="p-2 font-mono">{{ "%.0f"|format(r.confidence * 100) }}%</td>
-          <td class="p-2 text-xs text-gray-600">{{ r.reason }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<section class="workstation-panel">
+  <div class="panel-header">
+    <div class="panel-title">
+      <i data-lucide="brain-circuit" class="w-4 h-4 text-purple-600"></i>
+      贝叶斯校准
+    </div>
+    <span class="panel-caption">{{ start_date }} → {{ end_date }}</span>
   </div>
-  {% else %}
-  <div class="text-gray-400 text-sm py-8 text-center">
-    <i data-lucide="clipboard-x" class="w-8 h-8 mx-auto mb-2 text-gray-300"></i>
-    暂无校准数据（样本不足或无买入信号）
+  <div class="panel-body">
+    {% if reports %}
+    <div class="overflow-x-auto">
+      <table class="terminal-table">
+        <thead>
+          <tr>
+            <th>排名</th>
+            <th>标的</th>
+            <th>静态分</th>
+            <th>建议分</th>
+            <th>偏见惩罚</th>
+            <th>置信度</th>
+            <th>原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reports %}
+          {% set penalty_color = "score-danger" if r.bias_penalty < -5 else ("score-warning" if r.bias_penalty < -1 else "score-positive") %}
+          <tr>
+            <td class="mono text-slate-500">{{ loop.index }}</td>
+            <td class="font-bold">
+              {% if r.name and r.name != r.symbol %}
+                {{ r.name }}（{{ r.symbol }}）
+              {% else %}
+                {{ r.symbol }}
+              {% endif %}
+            </td>
+            <td class="mono">{{ "%.1f"|format(r.static_score) }}</td>
+            <td class="mono font-bold">
+              {% if r.suggested_score is not none %}
+                {{ "%.1f"|format(r.suggested_score) }}
+              {% else %}
+                <span class="text-slate-400">N/A</span>
+              {% endif %}
+            </td>
+            <td class="mono font-bold {{ penalty_color }}">{{ "%.2f"|format(r.bias_penalty) }}</td>
+            <td class="mono">{{ "%.0f"|format(r.confidence * 100) }}%</td>
+            <td class="text-xs text-slate-600">{{ r.reason }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state min-h-[140px]">
+      <div>
+        <i data-lucide="clipboard-x" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+        <div class="font-semibold text-slate-600">暂无校准数据</div>
+      </div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
-</div>
+</section>

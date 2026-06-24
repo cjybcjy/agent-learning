@@ -12,6 +12,7 @@ from sentinel.mgfs.execution.stop_loss_monitor import StopLossMonitor
 from sentinel.mgfs.factor_plugin import TargetInfo
 from sentinel.mgfs.orchestrator import MGFSOrchestrator
 from sentinel.mgfs.storage.mgfs_repository import MGFSRepository
+from sentinel.mgfs.target_resolver import TargetResolver, load_target_name_map
 from sentinel.web.dependencies import get_orchestrator
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ class PipelineService:
         return self.repository.list_pipeline_batches(limit=limit)
 
     def get_pipeline_results(self, batch_id: str) -> list[dict[str, Any]]:
-        return self.repository.get_pipeline_results(batch_id)
+        return self._enrich_result_names(self.repository.get_pipeline_results(batch_id))
 
     def _run_stop_loss_scan(self) -> None:
         """Post-pipeline stop-loss scan on active holdings."""
@@ -100,7 +101,7 @@ class PipelineService:
             "symbol", "name", "moat_score", "valuation_percentile",
             "timing_score", "final_score", "rating", "action",
         ])
-        for row in self.repository.get_pipeline_results(batch_id):
+        for row in self.get_pipeline_results(batch_id):
             writer.writerow([
                 row["symbol"],
                 row["name"],
@@ -115,6 +116,18 @@ class PipelineService:
 
     # -- internal ---------------------------------------------------------
 
+    def _enrich_result_names(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        names = load_target_name_map(settings.resolved_config_dir / "moat_static_base.yaml")
+        enriched: list[dict[str, Any]] = []
+        for row in rows:
+            symbol = str(row.get("symbol", ""))
+            current_name = row.get("name")
+            resolved_name = names.get(symbol)
+            if resolved_name and (not current_name or current_name == symbol):
+                row = {**row, "name": resolved_name}
+            enriched.append(row)
+        return enriched
+
     def _load_stock_pool(self) -> list[TargetInfo]:
         """Load active stock pool from moat config."""
         import yaml
@@ -124,14 +137,18 @@ class PipelineService:
         data = yaml.safe_load(moat_path.read_text(encoding="utf-8")) or {}
         companies = data.get("companies", {})
         targets: list[TargetInfo] = []
+        resolver = TargetResolver(moat_path)
         for symbol, cfg in companies.items():
             cfg = cfg or {}
             targets.append(
-                TargetInfo(
+                resolver.resolve(
                     symbol=symbol,
                     market=Market.A_SHARE,
                     asset_class="equity",
+                    name=cfg.get("name"),
                     sector=cfg.get("sector"),
+                    theme=cfg.get("theme"),
+                    ecosystem_role=cfg.get("ecosystem_role"),
                 )
             )
         return targets

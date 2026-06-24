@@ -1,9 +1,9 @@
 {% if status == "pending" %}
   准备中...
 {% elif status == "running" %}
-  评估中: {{ completed }} / {{ total }}
+  候选池 {{ total }} 只，正在评估...
 {% elif status == "completed" %}
-  ✅ 扫描完成: {{ completed }} 只标的通过筛选
+  扫描完成: {{ completed }} / {{ total }} 只标的通过筛选
 {% elif status == "failed" %}
-  ❌ 扫描失败: {{ error }}
+  扫描失败: {{ error }}
 {% endif %}

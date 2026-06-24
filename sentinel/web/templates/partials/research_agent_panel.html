@@ -1,0 +1,172 @@
+{% if message %}
+<div class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800 text-sm font-bold mb-4">
+  {{ message }}
+</div>
+{% endif %}
+
+{% if not run %}
+<div class="empty-state min-h-[220px]">
+  <div>
+    <i data-lucide="brain-circuit" class="w-9 h-9 mx-auto mb-3 text-slate-400"></i>
+    <div class="font-semibold text-slate-700">今日 Agent 尚未运行</div>
+    <div class="mt-1 text-xs text-slate-500">
+      启动后只生成建议和证据，不会改写任何 YAML 配置
+    </div>
+    <button hx-post="/api/research-agent/run"
+            hx-target="#research-agent-panel"
+            hx-swap="innerHTML"
+            class="ws-button primary mt-4">
+      <i data-lucide="sparkles" class="w-4 h-4"></i>
+      启动今日 Agent
+    </button>
+  </div>
+</div>
+{% else %}
+<div class="agent-toolbar">
+  <div>
+    <div class="agent-mode">
+      <i data-lucide="lock-keyhole" class="w-4 h-4"></i>
+      只读建议模式
+    </div>
+    <div class="text-xs text-slate-500 mt-1">
+      {{ run.generated_at }} · {{ run.summary }}
+    </div>
+  </div>
+  <div class="control-row">
+    <button hx-post="/api/research-agent/collect"
+            hx-target="#research-agent-panel"
+            hx-swap="innerHTML"
+            class="ws-button ghost">
+      <i data-lucide="radio-tower" class="w-4 h-4"></i>
+      更新外部信号
+    </button>
+    <button hx-post="/api/research-agent/run"
+            hx-target="#research-agent-panel"
+            hx-swap="innerHTML"
+            class="ws-button ghost">
+      <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      刷新今日建议
+    </button>
+  </div>
+</div>
+
+<div class="metric-strip">
+  <div class="metric-tile">
+    <div class="metric-label">内部配置源</div>
+    <div class="metric-value">{{ run.source_mix.get("internal_config", 0) }}</div>
+  </div>
+  <div class="metric-tile">
+    <div class="metric-label">反方检查</div>
+    <div class="metric-value">{{ run.source_mix.get("contrarian_checks", 0) }}</div>
+  </div>
+  <div class="metric-tile">
+    <div class="metric-label">外部新闻源</div>
+    <div class="metric-value">{{ run.source_mix.get("external_news", 0) }}</div>
+  </div>
+  <div class="metric-tile">
+    <div class="metric-label">建议数量</div>
+    <div class="metric-value">{{ run.suggestions|length }}</div>
+  </div>
+</div>
+
+{% if run.suggestions %}
+<div class="agent-suggestion-list">
+  {% for suggestion in run.suggestions %}
+  <article class="agent-suggestion-card">
+    <div class="agent-suggestion-topline">
+      <div class="control-row">
+        <span class="agent-badge">{{ suggestion.category }}</span>
+        <span class="status-chip info">置信度 {{ "%.0f"|format(suggestion.confidence * 100) }}%</span>
+        <span class="status-chip {% if suggestion.impact == '高' %}warn{% else %}info{% endif %}">
+          影响 {{ suggestion.impact }}
+        </span>
+      </div>
+      <span class="agent-status">{{ status_labels.get(suggestion.status, suggestion.status) }}</span>
+    </div>
+
+    <h3 class="agent-suggestion-title">{{ suggestion.title }}</h3>
+    <div class="agent-suggestion-meta">
+      <span>{{ suggestion.target }}</span>
+      <span>{{ suggestion.config_file }}</span>
+    </div>
+    <p class="agent-copy">{{ suggestion.rationale }}</p>
+    <div class="agent-proposal">
+      <div class="agent-proposal-label">建议动作</div>
+      <div>{{ suggestion.proposed_change }}</div>
+    </div>
+
+    <div class="agent-evidence-grid">
+      <div class="agent-evidence-box">
+        <div class="agent-evidence-title">
+          <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+          支持证据
+        </div>
+        {% for evidence in suggestion.evidence %}
+        <div class="agent-evidence-item">
+          <strong>{{ evidence.source }} · {{ evidence.title }}</strong>
+          <span>{{ evidence.detail }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="agent-evidence-box counter">
+        <div class="agent-evidence-title">
+          <i data-lucide="scale" class="w-4 h-4"></i>
+          反向证据
+        </div>
+        {% for evidence in suggestion.counter_evidence %}
+        <div class="agent-evidence-item">
+          <strong>{{ evidence.source }} · {{ evidence.title }}</strong>
+          <span>{{ evidence.detail }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="agent-actions">
+      <button type="button"
+              hx-get="/api/config/load/{{ suggestion.config_file }}"
+              hx-target="#config-editor-container"
+              hx-swap="innerHTML"
+              onclick="document.querySelector('#config-console')?.scrollIntoView({behavior: 'smooth', block: 'start'});"
+              class="ws-button ghost">
+        <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i>
+        跳转处理
+      </button>
+      <button hx-post="/api/research-agent/suggestions/{{ suggestion.id }}/status"
+              hx-vals='{"status":"queued"}'
+              hx-target="#research-agent-panel"
+              hx-swap="innerHTML"
+              class="ws-button primary">
+        <i data-lucide="list-plus" class="w-4 h-4"></i>
+        加入待办
+      </button>
+      <button hx-post="/api/research-agent/suggestions/{{ suggestion.id }}/status"
+              hx-vals='{"status":"watching"}'
+              hx-target="#research-agent-panel"
+              hx-swap="innerHTML"
+              class="ws-button ghost">
+        <i data-lucide="eye" class="w-4 h-4"></i>
+        观察
+      </button>
+      <button hx-post="/api/research-agent/suggestions/{{ suggestion.id }}/status"
+              hx-vals='{"status":"rejected"}'
+              hx-target="#research-agent-panel"
+              hx-swap="innerHTML"
+              class="ws-button ghost">
+        <i data-lucide="x" class="w-4 h-4"></i>
+        搁置
+      </button>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state min-h-[160px]">
+  <div>
+    <i data-lucide="shield-check" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
+    <div class="font-semibold text-slate-700">今日未发现明显配置偏差</div>
+    <div class="mt-1 text-xs text-slate-500">保持人工复核节奏，等待下一轮流水线和校准报告</div>
+  </div>
+</div>
+{% endif %}
+{% endif %}

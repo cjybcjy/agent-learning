@@ -12,6 +12,7 @@ from typing import Any
 from sentinel.config import AppSettings
 from sentinel.mgfs.evolution.bayes_calibrator import BayesCalibrator, CalibrationReport
 from sentinel.mgfs.evolution.batch_backtest import BatchBacktest
+from sentinel.mgfs.target_resolver import load_target_name_map
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = AppSettings()
         score_path = settings.resolved_config_dir / "moat_static_base.yaml"
     static_scores = _load_yaml_scores(score_path)
+    target_names = load_target_name_map(score_path)
 
     # Load price data from Eastmoney cache
     price_loaders: dict[str, dict[date, float]] = {}
@@ -178,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         # Use static score as daily evaluator score for simplicity
         score = static_scores.get(symbol, 50.0)
         evaluators[symbol] = {d: score for d in prices}
-        names[symbol] = symbol  # Could lookup from cache SECUCODE if needed
+        names[symbol] = target_names.get(symbol, symbol)
 
     if not price_loaders:
         logger.error("No valid price data loaded for any symbol")

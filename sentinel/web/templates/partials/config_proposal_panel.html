@@ -1,0 +1,91 @@
+{% if message %}
+<div class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800 text-sm font-bold mb-3">
+  {{ message }}
+</div>
+{% endif %}
+
+<div class="agent-toolbar">
+  <div>
+    <div class="agent-mode">
+      <i data-lucide="list-checks" class="w-4 h-4"></i>
+      半自动确认
+    </div>
+    <div class="text-xs text-slate-500 mt-1">
+      系统只生成结构化 add/delete，人工逐条点勾或叉
+    </div>
+  </div>
+  <button hx-get="/api/config/proposals/panel"
+          hx-target="#config-proposal-panel"
+          hx-swap="innerHTML"
+          class="ws-button ghost">
+    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+    刷新
+  </button>
+</div>
+
+{% if proposals %}
+<div class="overflow-x-auto">
+  <table class="terminal-table">
+    <thead>
+      <tr>
+        <th>动作</th>
+        <th>配置项</th>
+        <th>建议值</th>
+        <th>依据</th>
+        <th>确认</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for proposal in proposals %}
+      <tr>
+        <td>
+          <span class="status-chip {% if proposal.action == 'delete' %}warn{% else %}info{% endif %}">
+            {{ action_labels.get(proposal.action, proposal.action) }}
+          </span>
+        </td>
+        <td>
+          <div class="font-semibold text-slate-700">{{ proposal.title }}</div>
+          <div class="mono text-xs text-slate-500">{{ proposal.config_file }} · {{ proposal.path }}</div>
+        </td>
+        <td class="text-xs text-slate-600">
+          {% if proposal.action == "delete" %}
+          删除该条目
+          {% else %}
+          <span class="mono">{{ proposal.proposed_value }}</span>
+          {% endif %}
+        </td>
+        <td class="text-xs text-slate-600">{{ proposal.rationale }}</td>
+        <td>
+          <div class="control-row">
+            <button title="确认应用"
+                    aria-label="确认应用"
+                    hx-post="/api/config/proposals/{{ proposal.id }}/approve"
+                    hx-target="#config-proposal-panel"
+                    hx-swap="innerHTML"
+                    class="ws-button success">
+              <i data-lucide="check" class="w-4 h-4"></i>
+            </button>
+            <button title="搁置该条"
+                    aria-label="搁置该条"
+                    hx-post="/api/config/proposals/{{ proposal.id }}/reject"
+                    hx-target="#config-proposal-panel"
+                    hx-swap="innerHTML"
+                    class="ws-button ghost">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state min-h-[140px]">
+  <div>
+    <i data-lucide="shield-check" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
+    <div class="font-semibold text-slate-700">没有待确认配置变更</div>
+    <div class="mt-1 text-xs text-slate-500">系统会在发现可验证的添加/删除项时放入这里</div>
+  </div>
+</div>
+{% endif %}
