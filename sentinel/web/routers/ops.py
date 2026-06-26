@@ -451,9 +451,18 @@ async def calibration_reports(
 
     from sentinel.config import AppSettings
     from sentinel.mgfs.evolution.backtest_cli import _load_eastmoney_cache, _load_yaml_scores
+    from sentinel.mgfs.evolution.research_artifacts import (
+        file_content_hash,
+        stable_json_hash,
+        write_backtest_research_artifacts,
+    )
 
     settings = AppSettings()
     score_path = settings.resolved_config_dir / "moat_static_base.yaml"
+    config_hash = file_content_hash(score_path)
+    external_signal_hash = file_content_hash(
+        settings.database_path.parent / "research_external_signals.json"
+    )
     static_scores = _load_yaml_scores(score_path)
     target_names = load_target_name_map(score_path)
 
@@ -484,7 +493,34 @@ async def calibration_reports(
         names[symbol] = target_names.get(symbol, symbol)
 
     reports = []
+    validation_report = None
+    research_run_dir = None
     if price_loaders:
+        artifact_slug = stable_json_hash(
+            {
+                "symbols": sorted(price_loaders),
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                "config_hash": config_hash,
+                "external_signal_hash": external_signal_hash,
+            }
+        )
+        research_run_dir = (
+            settings.database_path.parent
+            / "mgfs_research_runs"
+            / f"historical_backtest_{artifact_slug}"
+        )
+        validation_report = write_backtest_research_artifacts(
+            run_dir=research_run_dir,
+            symbols=list(price_loaders.keys()),
+            names=names,
+            static_scores=static_scores,
+            price_loaders=price_loaders,
+            start_date=start,
+            end_date=end,
+            config_hash=config_hash,
+            external_signal_hash=external_signal_hash,
+        )
         reports = _run_backtest(
             symbols=list(price_loaders.keys()),
             price_loaders=price_loaders,
@@ -504,5 +540,7 @@ async def calibration_reports(
             "reports": reports,
             "start_date": start_date,
             "end_date": end_date,
+            "validation_report": validation_report,
+            "research_run_dir": research_run_dir,
         }
     )

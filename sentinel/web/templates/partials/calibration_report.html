@@ -1,61 +1,86 @@
-<section class="workstation-panel">
-  <div class="panel-header">
-    <div class="panel-title">
-      <i data-lucide="brain-circuit" class="w-4 h-4 text-purple-600"></i>
-      贝叶斯校准
+<div class="metric-strip mb-4">
+  <div class="metric-tile">
+    <div class="metric-label">研究可信度</div>
+    <div class="metric-value">
+      {% if validation_report %}
+        {{ "校验通过" if validation_report.passed else "校验未通过" }}
+      {% else %}
+        待生成
+      {% endif %}
     </div>
-    <span class="panel-caption">{{ start_date }} → {{ end_date }}</span>
   </div>
-  <div class="panel-body">
-    {% if reports %}
-    <div class="overflow-x-auto">
-      <table class="terminal-table">
-        <thead>
-          <tr>
-            <th>排名</th>
-            <th>标的</th>
-            <th>静态分</th>
-            <th>建议分</th>
-            <th>偏见惩罚</th>
-            <th>置信度</th>
-            <th>原因</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in reports %}
-          {% set penalty_color = "score-danger" if r.bias_penalty < -5 else ("score-warning" if r.bias_penalty < -1 else "score-positive") %}
-          <tr>
-            <td class="mono text-slate-500">{{ loop.index }}</td>
-            <td class="font-bold">
-              {% if r.name and r.name != r.symbol %}
-                {{ r.name }}（{{ r.symbol }}）
-              {% else %}
-                {{ r.symbol }}
-              {% endif %}
-            </td>
-            <td class="mono">{{ "%.1f"|format(r.static_score) }}</td>
-            <td class="mono font-bold">
-              {% if r.suggested_score is not none %}
-                {{ "%.1f"|format(r.suggested_score) }}
-              {% else %}
-                <span class="text-slate-400">N/A</span>
-              {% endif %}
-            </td>
-            <td class="mono font-bold {{ penalty_color }}">{{ "%.2f"|format(r.bias_penalty) }}</td>
-            <td class="mono">{{ "%.0f"|format(r.confidence * 100) }}%</td>
-            <td class="text-xs text-slate-600">{{ r.reason }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="empty-state min-h-[140px]">
-      <div>
-        <i data-lucide="clipboard-x" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
-        <div class="font-semibold text-slate-600">暂无校准数据</div>
-      </div>
-    </div>
-    {% endif %}
+  <div class="metric-tile">
+    <div class="metric-label">回测窗口</div>
+    <div class="metric-value text-base">{{ start_date }} → {{ end_date }}</div>
   </div>
-</section>
+  <div class="metric-tile">
+    <div class="metric-label">研究工件</div>
+    <div class="metric-value text-base">decision_inputs.jsonl</div>
+  </div>
+</div>
+
+{% if validation_report %}
+<div class="mb-4 text-xs text-slate-600">
+  <span class="font-semibold">工件目录：</span>
+  <span class="mono">{{ research_run_dir }}</span>
+  <span class="ml-2">包含 decision_inputs.jsonl / mgfs_research_signal_v1.jsonl / agent_discussion.md</span>
+</div>
+{% if validation_report.failures %}
+<div class="mb-4 rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+  {% for failure in validation_report.failures %}
+    <div>{{ failure }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+{% if reports %}
+<div class="overflow-x-auto">
+  <table class="terminal-table">
+    <thead>
+      <tr>
+        <th>排名</th>
+        <th>标的</th>
+        <th>静态分</th>
+        <th>建议分</th>
+        <th>偏见惩罚</th>
+        <th>置信度</th>
+        <th>原因</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reports %}
+      {% set penalty_color = "score-danger" if r.bias_penalty < -5 else ("score-warning" if r.bias_penalty < -1 else "score-positive") %}
+      <tr>
+        <td class="mono text-slate-500">{{ loop.index }}</td>
+        <td class="font-bold">
+          {% if r.name and r.name != r.symbol %}
+            {{ r.name }}（{{ r.symbol }}）
+          {% else %}
+            {{ r.symbol }}
+          {% endif %}
+        </td>
+        <td class="mono">{{ "%.1f"|format(r.static_score) }}</td>
+        <td class="mono font-bold">
+          {% if r.suggested_score is not none %}
+            {{ "%.1f"|format(r.suggested_score) }}
+          {% else %}
+            <span class="text-slate-400">N/A</span>
+          {% endif %}
+        </td>
+        <td class="mono font-bold {{ penalty_color }}">{{ "%.2f"|format(r.bias_penalty) }}</td>
+        <td class="mono">{{ "%.0f"|format(r.confidence * 100) }}%</td>
+        <td class="text-xs text-slate-600">{{ r.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state min-h-[140px]">
+  <div>
+    <i data-lucide="clipboard-x" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+    <div class="font-semibold text-slate-600">暂无校准数据</div>
+  </div>
+</div>
+{% endif %}

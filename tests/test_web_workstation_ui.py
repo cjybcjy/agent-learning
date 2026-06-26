@@ -75,14 +75,16 @@ def test_ops_page_renders_system_console_components():
     assert 'hx-get="/api/config/load/research_signal_sources.yaml"' in response.text
     assert "保存前会先执行 YAML 与 MGFS Schema 校验" in response.text
     assert "流水线监控" in response.text
+    assert "历史回测与研究可信度" in response.text
     assert "workflow-guide" in response.text
     assert "1 每日研究 Agent" in response.text
     assert "2 配置规则" in response.text
     assert "3 执行巡检" in response.text
-    assert "4 复盘修正" in response.text
+    assert "4 历史回测" in response.text
     assert 'href="#daily-research-agent"' in response.text
     assert 'href="#config-console"' in response.text
     assert 'href="#pipeline-monitor"' in response.text
+    assert 'href="#historical-backtest-panel"' in response.text
     assert 'hx-get="/api/research-agent/panel"' in response.text
     assert 'hx-get="/api/config/load/mgfs_config.yaml"' in response.text
     assert 'hx-get="/api/config/proposals/panel"' in response.text
@@ -90,3 +92,5 @@ def test_ops_page_renders_system_console_components():
     assert 'id="config-proposal-panel"' in response.text
     assert 'id="config-editor-container"' in response.text
     assert 'id="pipeline-section"' in response.text
+    assert 'id="historical-backtest-panel"' in response.text
+    assert 'hx-get="/api/calibration/reports"' in response.text

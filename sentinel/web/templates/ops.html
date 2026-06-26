@@ -23,9 +23,9 @@
         <span class="workflow-step-title">3 执行巡检</span>
         <span class="workflow-step-note">触发大盘扫描并查看批次</span>
       </a>
-      <a class="workflow-step" href="/dashboard/research#calibration-lab">
-        <span class="workflow-step-title">4 复盘修正</span>
-        <span class="workflow-step-note">用校准报告修正 YAML 评分</span>
+      <a class="workflow-step" href="#historical-backtest-panel">
+        <span class="workflow-step-title">4 历史回测</span>
+        <span class="workflow-step-note">把研究可信度和校准结果放在同一面板</span>
       </a>
     </nav>
   </section>
@@ -168,6 +168,28 @@
     </div>
   </section>
   </div>
+
+  <section id="historical-backtest-panel" class="workstation-panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <i data-lucide="chart-no-axes-combined" class="w-4 h-4"></i>
+        历史回测与研究可信度
+      </div>
+      <span class="panel-caption">Backtest Evidence</span>
+    </div>
+    <div class="panel-body"
+         hx-get="/api/calibration/reports"
+         hx-trigger="load"
+         hx-swap="innerHTML"
+         id="historical-backtest-content">
+      <div class="empty-state min-h-[180px]">
+        <div>
+          <i data-lucide="loader-circle" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
+          <div class="font-semibold text-slate-700">历史回测加载中</div>
+        </div>
+      </div>
+    </div>
+  </section>
 </div>
 
 {% endblock %}

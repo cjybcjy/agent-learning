@@ -252,6 +252,110 @@ def test_decision_card_groups_timing_warning_with_technical_signal(monkeypatch):
     assert timing_warning not in data_gap_panel
 
 
+def test_decision_card_shows_judgment_logic_ticket(monkeypatch):
+    target = TargetInfo(
+        symbol="600519",
+        market=Market.A_SHARE,
+        asset_class="equity",
+        name="贵州茅台",
+        sector="白酒",
+    )
+    decision = InvestmentDecision(
+        target=target,
+        generated_at=datetime.now(),
+        factor_scores={
+            "moat": FactorScore(
+                factor_key="moat",
+                factor_name="护城河",
+                score=82.0,
+                confidence=0.72,
+                details={"trend_score": 78.0, "safety_score": 70.0},
+                warnings=["动态指标数据缺失，仅使用静态评分"],
+            ),
+            "valuation": FactorScore(
+                factor_key="valuation",
+                factor_name="估值",
+                score=68.0,
+                confidence=0.8,
+            ),
+            "policy": FactorScore(
+                factor_key="policy",
+                factor_name="政策传导",
+                score=80.0,
+                confidence=0.85,
+                details={"policy_rating": "core_support", "multiplier": 1.15},
+            ),
+            "timing": FactorScore(
+                factor_key="timing",
+                factor_name="量化择时",
+                score=55.0,
+                confidence=0.75,
+                details={
+                    "technical_signal": {
+                        "entry_label": "none",
+                        "entry_tags": [],
+                        "exit_label": "none",
+                        "exit_tags": [],
+                        "ma60": 1356.02,
+                        "bias60": -0.02,
+                        "ma60_slope20": 0.01,
+                        "rsi14": 48.0,
+                        "volume_ratio20": 1.05,
+                        "entry_zone_low": 1320.0,
+                        "entry_zone_high": 1380.0,
+                        "stop_reference": 1300.0,
+                        "instruction_boundary": "research_only",
+                    }
+                },
+            ),
+        },
+        raw_total=70.0,
+        policy_multiplier=1.15,
+        final_score=80.5,
+        rating="Accumulate",
+        action="继续观察",
+        circuit_breakers_triggered=[],
+        alert_level=AlertLevel.YELLOW_WARNING,
+        report_sections={
+            "overall_confidence": 0.76,
+            "watermark": "[数据部分缺失]",
+            "effective_policy_rating": "core_support",
+        },
+    )
+    monkeypatch.setattr(
+        "sentinel.web.routers.research.evaluate_single",
+        lambda **kwargs: decision,
+    )
+    monkeypatch.setattr(
+        "sentinel.web.routers.research.build_moat_radar_data",
+        lambda symbol: None,
+    )
+    monkeypatch.setattr(
+        "sentinel.web.routers.research.build_valuation_band_data",
+        lambda **kwargs: None,
+    )
+
+    response = TestClient(create_app()).post(
+        "/api/eval/single",
+        data={"symbol": "600519", "market": "A_SHARE"},
+    )
+
+    assert response.status_code == 200
+    assert 'data-testid="judgment-ticket"' in response.text
+    assert "判断逻辑票据" in response.text
+    assert "风险闸门" in response.text
+    assert "盈利能力" in response.text
+    assert "财务安全" in response.text
+    assert "政策传导" in response.text
+    assert "技术趋势" in response.text
+    assert "总分" in response.text
+    assert "最不放心" in response.text
+    assert 'hx-post="/api/research-data/fill-gaps"' in response.text
+    assert "执行补数据" in response.text
+    assert "巨潮风险公告核验" in response.text
+    assert 'name="task_keys"' in response.text
+
+
 def test_evaluate_single_uses_target_resolver_metadata(tmp_path, monkeypatch):
     moat_path = tmp_path / "moat_static_base.yaml"
     moat_path.write_text(

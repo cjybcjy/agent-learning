@@ -1,0 +1,116 @@
+{% if judgment_ticket %}
+{% set gate_colors = {
+  "pass": "border-emerald-200 bg-emerald-50 text-emerald-800",
+  "warning": "border-yellow-200 bg-yellow-50 text-yellow-800",
+  "veto": "border-red-200 bg-red-50 text-red-800"
+} %}
+{% set gate_label = {
+  "pass": "通过",
+  "warning": "警示",
+  "veto": "否决"
+} %}
+<section class="border-b border-slate-200 pb-4 mb-4" data-testid="judgment-ticket">
+  <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+    <div>
+      <div class="text-sm font-bold flex items-center gap-2">
+        <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+        判断逻辑票据
+      </div>
+      <div class="text-xs text-slate-500 mt-1">
+        {{ judgment_ticket.symbol }} · {{ judgment_ticket.market }} · 风险先行 / 价值 / 价格 / 政策 / 择时
+      </div>
+    </div>
+    <div class="text-right">
+      <div class="text-xs font-bold text-slate-500 uppercase tracking-wide">总分</div>
+      <div class="mono text-xl font-black text-slate-900">{{ judgment_ticket.total_score }}/12</div>
+    </div>
+  </div>
+
+  <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+    <div class="rounded-md border {{ gate_colors.get(judgment_ticket.risk_gate.status, 'border-slate-200 bg-slate-50 text-slate-700') }} px-3 py-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="font-bold">{{ judgment_ticket.risk_gate.label }}</div>
+        <span class="mono text-xs font-bold">{{ gate_label.get(judgment_ticket.risk_gate.status, judgment_ticket.risk_gate.status) }}</span>
+      </div>
+      <div class="mt-1 text-sm">{{ judgment_ticket.risk_gate.reason }}</div>
+      <div class="mt-2 text-xs opacity-90">
+        <span class="font-semibold">判断规则</span>
+        {{ judgment_ticket.risk_gate.rule }}
+      </div>
+    </div>
+    <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+      <div class="text-xs font-bold text-slate-500 uppercase tracking-wide">研究结论</div>
+      <div class="mt-1 text-base font-black text-slate-900">{{ judgment_ticket.conclusion }}</div>
+    </div>
+  </div>
+
+  <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3 mt-3">
+    {% for dimension in judgment_ticket.dimensions %}
+    <div class="rounded-md border border-slate-200 bg-white px-3 py-2">
+      <div class="flex items-center justify-between gap-2">
+        <div class="font-bold text-slate-800">{{ dimension.label }}</div>
+        <span class="mono text-sm font-black text-slate-900">{{ dimension.score }}/2</span>
+      </div>
+      <div class="mt-1 text-xs text-slate-600">{{ dimension.reason }}</div>
+      <div class="mt-2 text-xs text-slate-500">
+        <span class="font-semibold">需要数据</span>
+        {{ dimension.needed_data }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="grid gap-3 lg:grid-cols-2 mt-3 text-sm">
+    <div class="agent-evidence-box counter">
+      <div class="agent-evidence-title">
+        <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+        最不放心
+      </div>
+      <div class="agent-evidence-item"><span>{{ judgment_ticket.uncertainty }}</span></div>
+    </div>
+    <div class="agent-evidence-box">
+      <div class="agent-evidence-title">
+        <i data-lucide="database-zap" class="w-4 h-4"></i>
+        下一步补数据
+      </div>
+      {% for item in judgment_ticket.next_data %}
+      <div class="agent-evidence-item"><span>{{ item }}</span></div>
+      {% endfor %}
+      {% if judgment_ticket.next_tasks %}
+      <div class="mt-3 grid gap-2">
+        {% for task in judgment_ticket.next_tasks %}
+        <div class="rounded-md border border-slate-200 bg-white px-2.5 py-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="font-bold text-slate-800">{{ task.label }}</div>
+            <span class="mono text-[11px] font-bold text-slate-500">{{ task.source }} · {{ task.priority }}</span>
+          </div>
+          <div class="mt-1 text-xs text-slate-500">{{ task.scope }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <form
+        class="mt-3 flex flex-wrap items-center gap-2"
+        hx-post="/api/research-data/fill-gaps"
+        hx-target="#research-data-fill-result-{{ judgment_ticket.symbol }}"
+        hx-swap="innerHTML"
+      >
+        <input type="hidden" name="symbol" value="{{ judgment_ticket.symbol }}">
+        <input type="hidden" name="market" value="{{ judgment_ticket.market_key }}">
+        {% for task in judgment_ticket.next_tasks %}
+        <input type="hidden" name="task_keys" value="{{ task.task_key }}">
+        {% endfor %}
+        <button
+          type="submit"
+          class="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
+        >
+          <i data-lucide="database-zap" class="h-3.5 w-3.5"></i>
+          执行补数据
+        </button>
+        <span class="text-xs text-slate-500">只写动态指标与公告证据，不改 YAML 配置</span>
+      </form>
+      <div id="research-data-fill-result-{{ judgment_ticket.symbol }}" class="mt-3"></div>
+    </div>
+  </div>
+</section>
+{% endif %}

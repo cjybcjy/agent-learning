@@ -57,6 +57,7 @@ def test_daily_review_flags_stale_configs_and_theme_concentration(tmp_path):
     service = ResearchAgentService(
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-17",
     )
     run = service.run_daily_review()
@@ -97,6 +98,7 @@ def test_daily_review_persists_latest_run_and_status_without_editing_config(tmp_
     service = ResearchAgentService(
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-17",
     )
     run = service.run_daily_review()
@@ -146,6 +148,7 @@ def test_daily_review_flags_moat_scores_without_evidence_fields(tmp_path):
     service = ResearchAgentService(
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-17",
     )
     run = service.run_daily_review()
@@ -232,6 +235,7 @@ def test_daily_review_uses_external_signal_snapshot_for_policy_and_moat(tmp_path
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
         external_signal_path=signal_path,
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-23",
     )
 
@@ -271,6 +275,7 @@ def test_ensure_daily_review_runs_once_per_day(tmp_path):
     service = ResearchAgentService(
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-23",
     )
 
@@ -280,3 +285,77 @@ def test_ensure_daily_review_runs_once_per_day(tmp_path):
     payload = json.loads((tmp_path / "agent_runs.json").read_text(encoding="utf-8"))
     assert first.run_id == second.run_id
     assert len(payload["runs"]) == 1
+
+
+def test_daily_review_writes_research_signal_artifacts(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    _write_yaml(
+        config_dir / "policy_whitelist.yaml",
+        {"last_updated": "2026-06-20", "sectors": {}},
+    )
+    _write_yaml(
+        config_dir / "ecosystem_themes.yaml",
+        {"last_updated": "2026-06-20", "negative_watchlist": []},
+    )
+    _write_yaml(
+        config_dir / "moat_static_base.yaml",
+        {
+            "last_updated": "2026-06-20",
+            "companies": {
+                "300750": {
+                    "name": "宁德时代",
+                    "sector": "新能源汽车",
+                    "theme": "Smart_EV_Supply_Chain",
+                    "base_score": {},
+                }
+            },
+        },
+    )
+    signal_path = tmp_path / "research_external_signals.json"
+    signal_path.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-06-23T08:00:00",
+                "items": [
+                    {
+                        "category": "moat",
+                        "source": "交易所公告",
+                        "title": "宁德时代海外订单结构变化",
+                        "published_at": "2026-06-21",
+                        "symbols": ["300750"],
+                        "url": "https://example.com/300750",
+                        "polarity": "counter",
+                        "impact": "中",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    service = ResearchAgentService(
+        config_dir=config_dir,
+        store_path=tmp_path / "agent_runs.json",
+        external_signal_path=signal_path,
+        artifact_root=tmp_path / "research_runs",
+        today="2026-06-23",
+    )
+
+    run = service.run_daily_review()
+
+    assert run.artifact_dir is not None
+    artifact_dir = Path(run.artifact_dir)
+    discussion = artifact_dir / "agent_discussion.md"
+    signal_jsonl = artifact_dir / "mgfs_research_signal_v1.jsonl"
+    assert discussion.exists()
+    assert "护城河外部信号待复核" in discussion.read_text(encoding="utf-8")
+    signals = [
+        json.loads(line)
+        for line in signal_jsonl.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert signals
+    assert signals[0]["symbol"] == "300750"
+    assert signals[0]["instruction_boundary"] == "research_only"
+    assert signals[0]["evidence_hashes"]

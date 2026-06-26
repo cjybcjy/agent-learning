@@ -6,6 +6,8 @@ from fastapi.responses import HTMLResponse
 from sentinel.web.services.candidate_discovery_service import CandidateDiscoveryService
 from sentinel.web.services.eval_service import evaluate_single
 from sentinel.web.services.fundamental_advice_service import FundamentalAdviceService
+from sentinel.web.services.judgment_ticket_service import build_judgment_ticket
+from sentinel.web.services.research_data_task_service import ResearchDataTaskService
 from sentinel.web.services.moat_service import build_moat_radar_data
 from sentinel.web.services.serenity_metric_backfill_service import (
     SerenityMetricBackfillService,
@@ -24,6 +26,7 @@ router = APIRouter()
 _fundamental_advice_svc: FundamentalAdviceService | None = None
 _serenity_verification_svc: SerenityVerificationService | None = None
 _serenity_metric_backfill_svc: SerenityMetricBackfillService | None = None
+_research_data_task_svc: ResearchDataTaskService | None = None
 
 
 def _get_fundamental_advice_service() -> FundamentalAdviceService:
@@ -45,6 +48,13 @@ def _get_serenity_metric_backfill_service() -> SerenityMetricBackfillService:
     if _serenity_metric_backfill_svc is None:
         _serenity_metric_backfill_svc = SerenityMetricBackfillService()
     return _serenity_metric_backfill_svc
+
+
+def _get_research_data_task_service() -> ResearchDataTaskService:
+    global _research_data_task_svc
+    if _research_data_task_svc is None:
+        _research_data_task_svc = ResearchDataTaskService()
+    return _research_data_task_svc
 
 
 def _reset_runtime_services_after_metric_backfill() -> None:
@@ -106,6 +116,7 @@ async def eval_single(
         {
             "request": request,
             "decision": decision,
+            "judgment_ticket": build_judgment_ticket(decision),
             "moat_radar_data": moat_radar_data,
             "valuation_band_data": valuation_band_data,
         }
@@ -175,6 +186,23 @@ async def serenity_metric_backfill(request: Request):
     _reset_runtime_services_after_metric_backfill()
     return request.app.state.templates.get_template(
         "partials/serenity_metric_backfill_result.html"
+    ).render({"request": request, "result": result})
+
+
+@router.post("/research-data/fill-gaps", response_class=HTMLResponse)
+async def research_data_fill_gaps(request: Request):
+    form = await request.form()
+    symbol = str(form.get("symbol", "")).strip()
+    market = str(form.get("market", "A_SHARE")).strip() or "A_SHARE"
+    task_keys = [str(value).strip() for value in form.getlist("task_keys") if str(value).strip()]
+    kwargs = {"symbol": symbol, "market": market}
+    if task_keys:
+        kwargs["task_keys"] = task_keys
+    result = _get_research_data_task_service().fill_gaps(**kwargs)
+    if result.inserted_metric_count > 0:
+        _reset_runtime_services_after_metric_backfill()
+    return request.app.state.templates.get_template(
+        "partials/research_data_fill_result.html"
     ).render({"request": request, "result": result})
 
 

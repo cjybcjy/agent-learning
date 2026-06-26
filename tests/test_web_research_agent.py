@@ -28,6 +28,7 @@ def test_research_agent_panel_auto_runs_today_review(tmp_path, monkeypatch):
     service = ResearchAgentService(
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-17",
     )
     monkeypatch.setattr(ops_router, "_get_research_agent_service", lambda: service)
@@ -59,6 +60,7 @@ def test_research_agent_run_endpoint_renders_suggestions(tmp_path, monkeypatch):
     service = ResearchAgentService(
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-17",
     )
     monkeypatch.setattr(ops_router, "_get_research_agent_service", lambda: service)
@@ -93,6 +95,7 @@ def test_research_agent_status_endpoint_updates_suggestion(tmp_path, monkeypatch
     service = ResearchAgentService(
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-17",
     )
     run = service.run_daily_review()
@@ -126,6 +129,7 @@ def test_research_agent_collect_endpoint_refreshes_external_signals(tmp_path, mo
         config_dir=config_dir,
         store_path=tmp_path / "agent_runs.json",
         external_signal_path=tmp_path / "research_external_signals.json",
+        artifact_root=tmp_path / "research_runs",
         today="2026-06-23",
     )
 

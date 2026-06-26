@@ -15,6 +15,7 @@ __pycache__/
 data/*.duckdb
 data/research_agent_runs.json
 data/research_external_signals.json
+data/research_data/
 
 # Environments
 .venv/

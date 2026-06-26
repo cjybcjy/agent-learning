@@ -1,12 +1,34 @@
 from __future__ import annotations
 
+import html
+import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Protocol
 
+import requests
 import yaml
 
 from sentinel.config import AppSettings
+
+EASTMONEY_CLIST_HOSTS = (
+    "https://push2.eastmoney.com/api/qt/clist/get",
+    "https://79.push2.eastmoney.com/api/qt/clist/get",
+    "https://29.push2.eastmoney.com/api/qt/clist/get",
+    "https://17.push2.eastmoney.com/api/qt/clist/get",
+    "https://44.push2.eastmoney.com/api/qt/clist/get",
+)
+EASTMONEY_CLIST_UT = "bd1d9ddb04089700cf9c27f6f7426281"
+EASTMONEY_SUGGEST_URL = "https://searchapi.eastmoney.com/api/suggest/get"
+EASTMONEY_SUGGEST_TOKEN = "44c9d251add88e27b65ed86506f6e5da"
+FALLBACK_CONCEPT_BOARDS = {
+    "低空经济": ("低空经济", "309115"),
+    "无人机": ("无人机", "300889"),
+    "eVTOL": ("飞行汽车(eVTOL)", "309113"),
+    "飞行汽车": ("飞行汽车(eVTOL)", "309113"),
+    "飞行汽车(eVTOL)": ("飞行汽车(eVTOL)", "309113"),
+}
 
 
 @dataclass(slots=True)
@@ -49,12 +71,21 @@ class BoardProvider(Protocol):
     def list_industry_boards(self) -> list[dict[str, Any]]:
         ...
 
-    def board_constituents(self, source: str, board_name: str) -> list[dict[str, Any]]:
+    def board_constituents(
+        self,
+        source: str,
+        board_name: str,
+        board_code: str | None = None,
+    ) -> list[dict[str, Any]]:
         ...
 
 
 class AkshareBoardProvider:
     def list_concept_boards(self) -> list[dict[str, Any]]:
+        rows = _try_direct_eastmoney_board_list("concept")
+        if rows:
+            return rows
+
         import akshare as ak
 
         try:
@@ -63,6 +94,10 @@ class AkshareBoardProvider:
             return _normalize_ths_boards(_records(ak.stock_board_concept_name_ths()))
 
     def list_industry_boards(self) -> list[dict[str, Any]]:
+        rows = _try_direct_eastmoney_board_list("industry")
+        if rows:
+            return rows
+
         import akshare as ak
 
         try:
@@ -70,12 +105,34 @@ class AkshareBoardProvider:
         except Exception:
             return _normalize_ths_boards(_records(ak.stock_board_industry_name_ths()))
 
-    def board_constituents(self, source: str, board_name: str) -> list[dict[str, Any]]:
+    def board_constituents(
+        self,
+        source: str,
+        board_name: str,
+        board_code: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if source == "concept" and _is_ths_board_code(board_code):
+            rows = _try_ths_concept_constituents(str(board_code))
+            if rows:
+                return rows
+
+        eastmoney_code = (
+            str(board_code)
+            if _is_eastmoney_board_code(board_code)
+            else _resolve_eastmoney_board_code(board_name)
+        )
+        if eastmoney_code:
+            rows = _try_direct_eastmoney_board_constituents(eastmoney_code)
+            if rows:
+                return rows
+
         import akshare as ak
 
         if source == "industry":
-            return _records(ak.stock_board_industry_cons_em(symbol=board_name))
-        return _records(ak.stock_board_concept_cons_em(symbol=board_name))
+            return _records(
+                ak.stock_board_industry_cons_em(symbol=eastmoney_code or board_name)
+            )
+        return _records(ak.stock_board_concept_cons_em(symbol=eastmoney_code or board_name))
 
 
 class CandidateDiscoveryService:
@@ -119,7 +176,11 @@ class CandidateDiscoveryService:
             source = str(board["source"])
             board_name = str(board["board_name"])
             try:
-                rows = self.provider.board_constituents(source, board_name)
+                rows = self.provider.board_constituents(
+                    source,
+                    board_name,
+                    board_code=str(board.get("board_code") or "") or None,
+                )
             except Exception as exc:
                 warnings.append(
                     f"{_source_label(source)}板块 {board_name} 成分股读取失败: {_short_error(exc)}"
@@ -187,6 +248,10 @@ class CandidateDiscoveryService:
         return None
 
     def _matched_boards(self, search_terms: list[str]) -> tuple[list[dict[str, Any]], list[str]]:
+        fallback_matches = _fallback_concept_boards_for_terms(search_terms)
+        if fallback_matches:
+            return fallback_matches[: self.max_boards_per_source], []
+
         matched: list[dict[str, Any]] = []
         warnings: list[str] = []
         for source, loader in (
@@ -247,6 +312,29 @@ def _theme_terms(theme: dict[str, Any]) -> list[str]:
     return terms
 
 
+def _fallback_concept_boards_for_terms(search_terms: list[str]) -> list[dict[str, Any]]:
+    matched: list[dict[str, Any]] = []
+    seen_codes: set[str] = set()
+    for term in search_terms:
+        board = FALLBACK_CONCEPT_BOARDS.get(term)
+        if board is None:
+            continue
+        board_name, board_code = board
+        if board_code in seen_codes:
+            continue
+        seen_codes.add(board_code)
+        matched.append(
+            {
+                "source": "concept",
+                "board_name": board_name,
+                "board_code": board_code,
+                "matched_terms": [term],
+                "rank": len(matched) + 1,
+            }
+        )
+    return matched
+
+
 def _split_term_phrase(value: str) -> list[str]:
     terms = [value]
     for sep in ("与", "/", "／", "、", ",", "，", " "):
@@ -298,6 +386,251 @@ def _normalize_ths_boards(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return normalized
+
+
+def _try_direct_eastmoney_board_list(source: str) -> list[dict[str, Any]]:
+    try:
+        return _fetch_eastmoney_board_list(source)
+    except Exception:
+        return []
+
+
+def _try_direct_eastmoney_board_constituents(board_code: str) -> list[dict[str, Any]]:
+    try:
+        return _fetch_eastmoney_board_constituents(board_code)
+    except Exception:
+        return []
+
+
+def _try_ths_concept_constituents(ths_code: str) -> list[dict[str, Any]]:
+    try:
+        return _fetch_ths_concept_constituents(ths_code)
+    except Exception:
+        return []
+
+
+def _fetch_eastmoney_board_list(source: str) -> list[dict[str, Any]]:
+    if source == "industry":
+        params = _eastmoney_clist_params(
+            fs="m:90 t:2 f:!50",
+            fields="f12,f14",
+            fid="f3",
+            page_size=500,
+        )
+    else:
+        params = _eastmoney_clist_params(
+            fs="m:90 t:3 f:!50",
+            fields="f12,f14",
+            fid="f12",
+            page_size=500,
+        )
+    rows = _fetch_eastmoney_clist_pages(params)
+    normalized: list[dict[str, Any]] = []
+    for rank, row in enumerate(rows, start=1):
+        name = row.get("f14")
+        code = row.get("f12")
+        if not name or not code:
+            continue
+        normalized.append(
+            {
+                "排名": rank,
+                "板块名称": str(name),
+                "板块代码": str(code),
+            }
+        )
+    return normalized
+
+
+def _fetch_eastmoney_board_constituents(board_code: str) -> list[dict[str, Any]]:
+    if not _is_eastmoney_board_code(board_code):
+        return []
+    params = _eastmoney_clist_params(
+        fs=f"b:{board_code}",
+        fields="f12,f14",
+        fid="f3",
+        page_size=500,
+    )
+    rows = _fetch_eastmoney_clist_pages(params)
+    normalized: list[dict[str, Any]] = []
+    for row in rows:
+        symbol = row.get("f12")
+        name = row.get("f14")
+        if not symbol or not name:
+            continue
+        normalized.append({"代码": str(symbol), "名称": str(name)})
+    return normalized
+
+
+@lru_cache(maxsize=512)
+def _fetch_ths_concept_constituents(ths_code: str) -> list[dict[str, Any]]:
+    if not _is_ths_board_code(ths_code):
+        return []
+    response = requests.get(
+        f"https://q.10jqka.com.cn/gn/detail/code/{ths_code}/",
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0 Safari/537.36"
+            ),
+            "Referer": "https://q.10jqka.com.cn/gn/",
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+    response.encoding = response.apparent_encoding or "gbk"
+    pattern = re.compile(
+        r'<td>\s*<a[^>]+stockpage\.10jqka\.com\.cn/(\d{6})/?[^>]*>\s*\1\s*</a>\s*</td>\s*'
+        r'<td>\s*<a[^>]+stockpage\.10jqka\.com\.cn/\1/?[^>]*>\s*([^<]+?)\s*</a>\s*</td>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for symbol, name in pattern.findall(response.text):
+        if symbol in seen:
+            continue
+        seen.add(symbol)
+        rows.append({"代码": symbol, "名称": html.unescape(name).strip()})
+    return rows
+
+
+@lru_cache(maxsize=256)
+def _resolve_eastmoney_board_code(board_name: str) -> str | None:
+    clean_name = board_name.strip()
+    if not clean_name:
+        return None
+    last_exc: Exception | None = None
+    for trust_env in (True, False):
+        session = requests.Session()
+        session.trust_env = trust_env
+        try:
+            response = session.get(
+                EASTMONEY_SUGGEST_URL,
+                params={
+                    "input": clean_name,
+                    "type": "14",
+                    "token": EASTMONEY_SUGGEST_TOKEN,
+                },
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (X11; Linux x86_64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/125.0 Safari/537.36"
+                    )
+                },
+                timeout=8,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            rows = (
+                payload.get("QuotationCodeTable", {}).get("Data", [])
+                if isinstance(payload, dict)
+                else []
+            )
+            exact: list[dict[str, Any]] = []
+            loose: list[dict[str, Any]] = []
+            for row in rows:
+                if not isinstance(row, dict) or row.get("Classify") != "BK":
+                    continue
+                code = str(row.get("Code") or "")
+                name = str(row.get("Name") or "")
+                if not _is_eastmoney_board_code(code):
+                    continue
+                if name == clean_name:
+                    exact.append(row)
+                elif clean_name in name or name in clean_name:
+                    loose.append(row)
+            chosen = exact[0] if exact else (loose[0] if loose else None)
+            if chosen is not None:
+                return str(chosen["Code"])
+        except Exception as exc:
+            last_exc = exc
+        finally:
+            session.close()
+    if last_exc is not None:
+        return None
+    return None
+
+
+def _fetch_eastmoney_clist_pages(params: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    page_size = int(params.get("pz") or 500)
+    for page in range(1, 8):
+        payload = _fetch_eastmoney_clist_json({**params, "pn": page})
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, dict):
+            break
+        diff = data.get("diff") or []
+        if not isinstance(diff, list) or not diff:
+            break
+        rows.extend(item for item in diff if isinstance(item, dict))
+        total = _coerce_int(data.get("total")) or len(rows)
+        if len(rows) >= total or len(diff) < page_size:
+            break
+    return rows
+
+
+def _fetch_eastmoney_clist_json(params: dict[str, Any]) -> dict[str, Any]:
+    last_exc: Exception | None = None
+    for url in EASTMONEY_CLIST_HOSTS:
+        for trust_env in (True, False):
+            session = requests.Session()
+            session.trust_env = trust_env
+            try:
+                response = session.get(
+                    url,
+                    params=params,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (X11; Linux x86_64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/125.0 Safari/537.36"
+                        ),
+                        "Referer": "https://quote.eastmoney.com/",
+                    },
+                    timeout=8,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if isinstance(payload, dict) and int(payload.get("rc", 0)) == 0:
+                    return payload
+                last_exc = RuntimeError(f"Eastmoney rc={payload.get('rc')}")
+            except Exception as exc:
+                last_exc = exc
+            finally:
+                session.close()
+    raise RuntimeError(f"Eastmoney clist request failed: {last_exc}")
+
+
+def _eastmoney_clist_params(
+    *,
+    fs: str,
+    fields: str,
+    fid: str,
+    page_size: int,
+) -> dict[str, Any]:
+    return {
+        "pn": 1,
+        "pz": page_size,
+        "po": 1,
+        "np": 1,
+        "ut": EASTMONEY_CLIST_UT,
+        "fltt": 2,
+        "invt": 2,
+        "fid": fid,
+        "fs": fs,
+        "fields": fields,
+    }
+
+
+def _is_eastmoney_board_code(value: str | None) -> bool:
+    text = str(value or "").strip()
+    return len(text) >= 3 and text.startswith("BK") and text[2:].isdigit()
+
+
+def _is_ths_board_code(value: str | None) -> bool:
+    text = str(value or "").strip()
+    return len(text) == 6 and text.isdigit()
 
 
 def _first_value(row: dict[str, Any], *keys: str) -> Any:

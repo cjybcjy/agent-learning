@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
@@ -11,6 +12,8 @@ from typing import Any
 import yaml
 
 from sentinel.config import AppSettings
+from sentinel.mgfs.evolution.research_artifacts import file_content_hash, stable_json_hash
+from sentinel.mgfs.evolution.research_signal import MGFSAgentSignal, merge_mgfs_agent_signals
 from sentinel.mgfs.moat_evidence import MoatEvidenceAuditor
 
 
@@ -81,6 +84,7 @@ class ResearchAgentRun:
     summary: str
     source_mix: dict[str, int]
     suggestions: list[ResearchSuggestion]
+    artifact_dir: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -102,6 +106,7 @@ class ResearchAgentRun:
                 for item in payload.get("suggestions", [])
                 if isinstance(item, dict)
             ],
+            artifact_dir=payload.get("artifact_dir"),
         )
 
 
@@ -116,6 +121,7 @@ class ResearchAgentService:
         config_dir: Path | str | None = None,
         store_path: Path | str | None = None,
         external_signal_path: Path | str | None = None,
+        artifact_root: Path | str | None = None,
         today: date | str | None = None,
     ) -> None:
         settings = AppSettings()
@@ -129,6 +135,11 @@ class ResearchAgentService:
             Path(external_signal_path)
             if external_signal_path is not None
             else settings.database_path.parent / "research_external_signals.json"
+        )
+        self.artifact_root = (
+            Path(artifact_root)
+            if artifact_root is not None
+            else settings.database_path.parent / "mgfs_research_runs"
         )
         self.today = self._coerce_date(today)
         self._moat_evidence_auditor = MoatEvidenceAuditor()
@@ -195,6 +206,7 @@ class ResearchAgentService:
             },
             suggestions=suggestions,
         )
+        run.artifact_dir = str(self._write_daily_artifacts(run))
         self._persist_run(run)
         return run
 
@@ -600,6 +612,101 @@ class ResearchAgentService:
             encoding="utf-8",
         )
 
+    def _write_daily_artifacts(self, run: ResearchAgentRun) -> Path:
+        artifact_dir = self.artifact_root / f"daily_research_{run.run_id}"
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        discussion_lines = [
+            f"# 每日研究 Agent 讨论 {run.run_id}\n\n",
+            f"- generated_at: {run.generated_at}\n",
+            f"- mode: {run.mode}\n",
+            f"- summary: {run.summary}\n\n",
+        ]
+        signal_lines: list[str] = []
+        for suggestion in run.suggestions:
+            discussion_lines.extend(
+                [
+                    f"## {suggestion.title}\n\n",
+                    f"- target: {suggestion.target}\n",
+                    f"- config_file: {suggestion.config_file}\n",
+                    f"- rationale: {suggestion.rationale}\n",
+                    f"- proposed_change: {suggestion.proposed_change}\n",
+                ]
+            )
+            symbol = _symbol_from_target(suggestion.target)
+            if not symbol:
+                continue
+            name = suggestion.target.replace(f"({symbol})", "").strip() or symbol
+            evidence_hashes = sorted(
+                {
+                    stable_json_hash(asdict(item))
+                    for item in suggestion.evidence + suggestion.counter_evidence
+                }
+            )
+            if not evidence_hashes:
+                evidence_hashes = [stable_json_hash(asdict(suggestion))]
+            config_hash = file_content_hash(self.config_dir / suggestion.config_file)
+            price_snapshot_hash = stable_json_hash(
+                {
+                    "source": "daily_research_agent",
+                    "run_id": run.run_id,
+                    "symbol": symbol,
+                    "as_of_date": self.today.isoformat(),
+                }
+            )
+            signal = merge_mgfs_agent_signals(
+                symbol=symbol,
+                name=name,
+                as_of_date=self.today,
+                signals=[
+                    MGFSAgentSignal(
+                        source="research_agent",
+                        action="hold_review",
+                        score=0.0,
+                        confidence=suggestion.confidence,
+                        rationale=suggestion.rationale,
+                        evidence_hashes=evidence_hashes,
+                        risk_flags=["requires_human_review"],
+                    )
+                ],
+                weights={"research_agent": 1.0},
+                config_hash=config_hash,
+                price_snapshot_hash=price_snapshot_hash,
+            )
+            signal_lines.append(signal.to_json())
+
+        (artifact_dir / "agent_discussion.md").write_text(
+            "".join(discussion_lines),
+            encoding="utf-8",
+        )
+        (artifact_dir / "mgfs_research_signal_v1.jsonl").write_text(
+            "\n".join(signal_lines) + ("\n" if signal_lines else ""),
+            encoding="utf-8",
+        )
+        (artifact_dir / "run_summary.json").write_text(
+            json.dumps(
+                {
+                    "ok": True,
+                    "run_id": run.run_id,
+                    "decision_count": len(signal_lines),
+                    "symbol_count": len(signal_lines),
+                    "adapter_status": {
+                        "point_in_time_inputs": "daily_research_snapshot",
+                        "research_signal_schema": "mgfs_research_signal_v1",
+                        "instruction_boundary": "research_only",
+                    },
+                    "borrowed_from": {
+                        "repo": "utopia",
+                        "patterns": ["agent_discussion", "research_signal_jsonl"],
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        return artifact_dir
+
     def _read_payload(self) -> dict[str, Any]:
         if not self.store_path.exists():
             return {}
@@ -644,6 +751,11 @@ def _signal_target(signal: dict[str, Any], key: str) -> str:
         return ""
     normalized = [str(item) for item in values if str(item).strip()]
     return "、".join(normalized)
+
+
+def _symbol_from_target(target: str) -> str:
+    match = re.search(r"(?<!\d)(\d{6})(?!\d)", target)
+    return match.group(1) if match else ""
 
 
 def _evidence_from_signal(signal: dict[str, Any]) -> EvidenceItem:

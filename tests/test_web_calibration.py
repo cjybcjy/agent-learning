@@ -10,8 +10,56 @@ from sentinel.config import AppSettings
 from sentinel.web.main import create_app
 
 
-def test_calibration_page_shows_report_table():
+def _prepare_calibration_env(
+    tmp_path: Path,
+    monkeypatch,
+    symbols: tuple[str, ...] = ("300750", "600519"),
+) -> None:
+    config_dir = tmp_path / "config"
+    data_dir = tmp_path / "data"
+    cache_dir = tmp_path / ".cache" / "sentinel" / "eastmoney"
+    config_dir.mkdir()
+    data_dir.mkdir()
+    cache_dir.mkdir(parents=True)
+    (config_dir / "moat_static_base.yaml").write_text(
+        """
+companies:
+  "300750":
+    name: "宁德时代"
+    base_score: 84.0
+  "600519":
+    name: "贵州茅台"
+    base_score: 80.6
+""",
+        encoding="utf-8",
+    )
+
+    import json
+
+    start = date(2025, 1, 1)
+    rows = [
+        {
+            "TRADE_DATE": str(start + timedelta(days=i)),
+            "CLOSE_PRICE": str(100 + i),
+        }
+        for i in range(35)
+    ]
+    for symbol in symbols:
+        (cache_dir / f"{symbol}_all_20250101.json").write_text(
+            json.dumps(rows),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(
+        "sentinel.config.AppSettings",
+        lambda: AppSettings(base_dir=tmp_path, config_dir=config_dir, data_dir=data_dir),
+    )
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+
+def test_calibration_page_shows_report_table(tmp_path, monkeypatch):
     """Calibration endpoint should return HTML table with bias penalties."""
+    _prepare_calibration_env(tmp_path, monkeypatch)
     with patch("sentinel.web.routers.ops._run_backtest") as mock_run:
         from sentinel.mgfs.evolution.bayes_calibrator import CalibrationReport
 
@@ -47,8 +95,9 @@ def test_calibration_page_shows_report_table():
         assert "贵州茅台" in html
 
 
-def test_calibration_page_shows_empty_state():
+def test_calibration_page_shows_empty_state(tmp_path, monkeypatch):
     """No reports → show empty message."""
+    _prepare_calibration_env(tmp_path, monkeypatch, symbols=())
     with patch("sentinel.web.routers.ops._run_backtest") as mock_run:
         mock_run.return_value = []
 
@@ -110,3 +159,58 @@ companies:
     assert response.status_code == 200
     assert "宁德时代（300750）" in response.text
     assert "300750（300750）" not in response.text
+
+
+def test_calibration_report_shows_research_validation_status(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    data_dir = tmp_path / "data"
+    config_dir.mkdir()
+    data_dir.mkdir()
+    (config_dir / "moat_static_base.yaml").write_text(
+        """
+companies:
+  "300750":
+    name: "宁德时代"
+    base_score: 86.0
+""",
+        encoding="utf-8",
+    )
+
+    cache_dir = tmp_path / ".cache" / "sentinel" / "eastmoney"
+    cache_dir.mkdir(parents=True)
+    start = date(2025, 1, 1)
+    rows = [
+        {
+            "TRADE_DATE": str(start + timedelta(days=i)),
+            "CLOSE_PRICE": str(100 + i),
+        }
+        for i in range(35)
+    ]
+    import json
+
+    (cache_dir / "300750_all_20250101.json").write_text(
+        json.dumps(rows),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "sentinel.config.AppSettings",
+        lambda: AppSettings(base_dir=tmp_path, config_dir=config_dir, data_dir=data_dir),
+    )
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    client = TestClient(create_app())
+    response = client.get(
+        "/api/calibration/reports",
+        params={
+            "symbols": "300750",
+            "start_date": "2025-01-01",
+            "end_date": "2025-02-28",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "研究可信度" in response.text
+    assert "校验通过" in response.text
+    assert "decision_inputs.jsonl" in response.text
+    assert "mgfs_research_signal_v1.jsonl" in response.text
