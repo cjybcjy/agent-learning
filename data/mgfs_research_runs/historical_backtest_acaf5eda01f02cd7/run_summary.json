@@ -1,0 +1,20 @@
+{
+  "adapter_status": {
+    "external_signal_hash_binding": "enabled",
+    "instruction_boundary": "research_only",
+    "point_in_time_inputs": "enabled",
+    "research_signal_schema": "mgfs_research_signal_v1"
+  },
+  "borrowed_from": {
+    "patterns": [
+      "point_in_time_inputs",
+      "alpha_signal_jsonl",
+      "run_artifact_validation"
+    ],
+    "repo": "utopia"
+  },
+  "decision_count": 2,
+  "ok": true,
+  "run_id": "MGFS_BACKTEST_2025-01-01_2025-06-30",
+  "symbol_count": 2
+}

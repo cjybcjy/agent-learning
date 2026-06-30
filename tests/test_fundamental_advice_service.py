@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yaml
 
+import sentinel.web.services.fundamental_advice_service as advice_service
 from sentinel.web.services.fundamental_advice_service import (
     FundamentalAdviceService,
     TradingAgentsEvidence,
@@ -186,3 +187,42 @@ print(json.dumps(payload, ensure_ascii=False))
     assert report.counter_evidence[0].polarity == "counter"
     assert "--symbol" in report.raw_decision
     assert "600519" in report.raw_decision
+
+
+def test_tradingagents_runner_auto_detects_repo_isolated_python(
+    tmp_path, monkeypatch
+):
+    helper = tmp_path / "fake_tradingagents_helper.py"
+    helper.write_text(
+        """
+from __future__ import annotations
+
+import json
+
+print(json.dumps({
+    "provider": "TradingAgents auto isolated",
+    "ticker": "300750.SZ",
+    "summary": "自动发现隔离环境",
+    "dimension_scores": {"cost_advantage": 87},
+    "confidence": 0.63,
+}, ensure_ascii=False))
+""".strip(),
+        encoding="utf-8",
+    )
+    python_bin = tmp_path / ".venv-tradingagents" / "bin" / "python"
+    python_bin.parent.mkdir(parents=True)
+    python_bin.symlink_to(sys.executable)
+    monkeypatch.delenv("TRADINGAGENTS_PYTHON", raising=False)
+    monkeypatch.setenv("TRADINGAGENTS_HELPER_SCRIPT", str(helper))
+    monkeypatch.setattr(advice_service, "_repo_root", lambda: tmp_path)
+
+    report = TradingAgentsRunner().run(
+        symbol="300750",
+        name="宁德时代",
+        market="A_SHARE",
+        sector="电池",
+    )
+
+    assert report.provider == "TradingAgents auto isolated"
+    assert report.ticker == "300750.SZ"
+    assert report.dimension_scores == {"cost_advantage": 87}

@@ -20,7 +20,13 @@ class MultiSourceFetcher(PriceFetcher):
         self._health: dict[int, list[bool]] = {}
 
     @classmethod
-    def default_chain(cls) -> MultiSourceFetcher:
+    def default_chain(
+        cls,
+        *,
+        request_timeout: float = 30.0,
+        max_retries: int = 3,
+        delay_scale: float = 1.0,
+    ) -> MultiSourceFetcher:
         """Build a priority chain of fetchers."""
         sources: list[PriceFetcher] = []
 
@@ -37,23 +43,45 @@ class MultiSourceFetcher(PriceFetcher):
         try:
             from sentinel.mgfs.data.eastmoney_kline_fetcher import EastmoneyKlineFetcher
 
-            sources.append(EastmoneyKlineFetcher())
+            sources.append(
+                EastmoneyKlineFetcher(
+                    request_timeout=request_timeout,
+                    max_retries=max_retries,
+                    delay_scale=delay_scale,
+                )
+            )
         except Exception:
             pass
 
         # 3. TencentKlineFetcher
         try:
+            from sentinel.mgfs.data.anti_bot_adapter import AntiBotAdapter
             from sentinel.mgfs.data.tencent_kline_fetcher import TencentKlineFetcher
 
-            sources.append(TencentKlineFetcher())
+            sources.append(
+                TencentKlineFetcher(
+                    adapter=AntiBotAdapter(
+                        request_timeout=request_timeout,
+                        delay_scale=delay_scale,
+                    )
+                )
+            )
         except Exception:
             pass
 
         # 4. SinaKlineFetcher
         try:
+            from sentinel.mgfs.data.anti_bot_adapter import AntiBotAdapter
             from sentinel.mgfs.data.sina_kline_fetcher import SinaKlineFetcher
 
-            sources.append(SinaKlineFetcher())
+            sources.append(
+                SinaKlineFetcher(
+                    adapter=AntiBotAdapter(
+                        request_timeout=request_timeout,
+                        delay_scale=delay_scale,
+                    )
+                )
+            )
         except Exception:
             pass
 

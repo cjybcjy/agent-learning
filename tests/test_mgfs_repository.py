@@ -165,6 +165,32 @@ def test_active_holdings_update_price_and_highest(settings):
     assert holdings[0]["highest_price"] == 1600.0
 
 
+def test_active_holdings_update_cost_only_changes_entry_price(settings):
+    db = Database(settings.database_path)
+    repo = MGFSRepository(db)
+    repo.bootstrap()
+
+    repo.save_active_holding(
+        symbol="600519",
+        name="贵州茅台",
+        sector="白酒",
+        entry_price=1500.0,
+        current_price=1520.0,
+        highest_price=1600.0,
+        weight=0.20,
+        stop_loss_hard=-0.20,
+        stop_loss_trailing=-0.15,
+        portfolio_stop_loss=-0.10,
+    )
+
+    repo.update_holding_cost("600519", 1488.0)
+
+    holding = repo.list_active_holdings()[0]
+    assert holding["entry_price"] == 1488.0
+    assert holding["current_price"] == 1520.0
+    assert holding["highest_price"] == 1600.0
+
+
 def test_active_holdings_delete(settings):
     db = Database(settings.database_path)
     repo = MGFSRepository(db)
@@ -185,3 +211,64 @@ def test_active_holdings_delete(settings):
 
     repo.delete_active_holding("600519")
     assert repo.list_active_holdings() == []
+
+
+def test_shadow_position_snapshots_are_saved_and_filtered(settings):
+    db = Database(settings.database_path)
+    repo = MGFSRepository(db)
+    repo.bootstrap()
+
+    repo.save_shadow_position_snapshot(
+        snapshot_id="snap-1",
+        symbol="600519",
+        name="贵州茅台",
+        sector="白酒",
+        entry_price=1500.0,
+        current_price=1575.0,
+        highest_price=1600.0,
+        weight=0.18,
+        kelly_fraction=0.20,
+        win_prob=0.72,
+        payoff_ratio=2.2,
+        unrealized_return=0.05,
+        drawdown_from_entry=0.05,
+        drawdown_from_high=-0.015625,
+        stop_loss_hard=-0.20,
+        stop_loss_trailing=-0.15,
+        portfolio_stop_loss=-0.10,
+        hard_stop_triggered=False,
+        trailing_stop_triggered=False,
+        portfolio_stop_triggered=False,
+        refresh_source="manual",
+    )
+    repo.save_shadow_position_snapshot(
+        snapshot_id="snap-2",
+        symbol="300750",
+        name="宁德时代",
+        sector="新能源",
+        entry_price=200.0,
+        current_price=180.0,
+        highest_price=210.0,
+        weight=0.12,
+        kelly_fraction=0.12,
+        win_prob=0.66,
+        payoff_ratio=1.8,
+        unrealized_return=-0.10,
+        drawdown_from_entry=-0.10,
+        drawdown_from_high=-0.142857,
+        stop_loss_hard=-0.20,
+        stop_loss_trailing=-0.15,
+        portfolio_stop_loss=-0.10,
+        hard_stop_triggered=False,
+        trailing_stop_triggered=False,
+        portfolio_stop_triggered=True,
+        refresh_source="pipeline",
+    )
+
+    snapshots = repo.list_shadow_position_snapshots(symbol="600519")
+
+    assert len(snapshots) == 1
+    assert snapshots[0]["snapshot_id"] == "snap-1"
+    assert snapshots[0]["symbol"] == "600519"
+    assert snapshots[0]["current_price"] == 1575.0
+    assert snapshots[0]["refresh_source"] == "manual"

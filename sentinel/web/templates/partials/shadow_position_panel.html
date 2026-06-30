@@ -1,0 +1,82 @@
+<div class="grid gap-4">
+  <form id="shadow-position-form"
+        class="grid gap-3"
+        hx-post="/api/shadow-positions/preview"
+        hx-target="#shadow-position-preview"
+        hx-swap="innerHTML">
+    <input type="hidden" name="market" value="A_SHARE">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <div class="text-sm font-black text-slate-800">Kelly 仓位模拟器</div>
+        <div class="text-xs text-slate-500">人工候选 · 手动成本 · 刷新拉取当前价</div>
+      </div>
+      <button type="submit" class="ws-button primary">
+        <i data-lucide="calculator" class="w-4 h-4"></i>
+        预览仓位
+      </button>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="terminal-table">
+        <thead>
+          <tr>
+            <th>代码</th>
+            <th>名称</th>
+            <th>行业</th>
+            <th>MGFS 分</th>
+            <th>赔率</th>
+            <th>成本价</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for idx in range(3) %}
+          <tr>
+            <td><input name="symbol" class="ws-input mono w-24" placeholder="600519"></td>
+            <td><input name="name" class="ws-input w-28" placeholder="贵州茅台"></td>
+            <td><input name="sector" class="ws-input w-24" placeholder="白酒"></td>
+            <td><input name="final_score" class="ws-input mono w-20" type="number" min="0" max="100" step="0.1" placeholder="92"></td>
+            <td><input name="payoff_ratio" class="ws-input mono w-20" type="number" min="0.1" step="0.1" placeholder="2.2"></td>
+            <td><input name="price" class="ws-input mono w-24" type="number" min="0.01" step="0.01" placeholder="手动"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+
+  <div id="shadow-position-preview"></div>
+
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <div class="text-sm font-black text-slate-800">影子持仓盯市</div>
+      <div class="text-xs text-slate-500">成本价手动维护，当前价通过刷新拉取</div>
+    </div>
+    <div class="control-row">
+      <button type="button"
+              class="ws-button ghost"
+              hx-post="/api/shadow-positions/cleanup-legacy"
+              hx-target="#shadow-position-holdings"
+              hx-swap="innerHTML">
+        <i data-lucide="eraser" class="w-4 h-4"></i>
+        清理旧数据
+      </button>
+      <button type="button"
+              class="ws-button ghost"
+              hx-post="/api/shadow-positions/refresh"
+              hx-vals='{"source": "manual"}'
+              hx-target="#shadow-position-holdings"
+              hx-swap="innerHTML">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        刷新价格
+      </button>
+    </div>
+  </div>
+
+  <div id="shadow-position-holdings">
+    {% include "partials/shadow_position_holdings.html" %}
+  </div>
+</div>
+
+<script>
+  if (window.lucide) window.lucide.createIcons();
+</script>

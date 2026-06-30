@@ -1,0 +1,71 @@
+{% set valid_rows = preview.rows | selectattr("error", "none") | list %}
+<div class="rounded-md border border-blue-100 bg-blue-50 p-3">
+  <div class="metric-strip mb-3">
+    <div class="metric-tile">
+      <div class="metric-label">总仓位</div>
+      <div class="metric-value text-base">{{ "%.0f"|format(preview.total_weight * 100) }}%</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-label">现金保留</div>
+      <div class="metric-value text-base">{{ "%.0f"|format(preview.cash_reserve * 100) }}%</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-label">组合止损</div>
+      <div class="metric-value text-base">{{ "%.0f"|format(preview.portfolio_stop_loss * 100) }}%</div>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="terminal-table">
+      <thead>
+        <tr>
+          <th>标的</th>
+          <th>价格</th>
+          <th>胜率</th>
+          <th>Kelly</th>
+          <th>最终仓位</th>
+          <th>状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in preview.rows %}
+        <tr>
+          <td>{{ row.name }} <span class="mono text-slate-500">{{ row.symbol }}</span></td>
+          <td class="mono">{{ "%.2f"|format(row.price) if row.price is not none else "—" }}</td>
+          <td class="mono">{{ "%.0f"|format(row.win_prob * 100) }}%</td>
+          <td class="mono">{{ "%.0f"|format(row.kelly_fraction * 100) }}%</td>
+          <td class="mono font-bold">{{ "%.0f"|format(row.weight * 100) }}%</td>
+          <td class="text-xs {{ 'text-red-700' if row.error else 'text-green-700' }}">
+            {{ row.error or "可确认" }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if valid_rows %}
+  <form class="mt-3"
+        hx-post="/api/shadow-positions/confirm"
+        hx-target="#shadow-position-holdings"
+        hx-swap="innerHTML">
+    <input type="hidden" name="market" value="A_SHARE">
+    {% for row in valid_rows %}
+    <input type="hidden" name="symbol" value="{{ row.symbol }}">
+    <input type="hidden" name="name" value="{{ row.name }}">
+    <input type="hidden" name="sector" value="{{ row.sector }}">
+    <input type="hidden" name="final_score" value="{{ row.final_score }}">
+    <input type="hidden" name="payoff_ratio" value="{{ row.payoff_ratio }}">
+    <input type="hidden" name="price" value="{{ row.price }}">
+    {% endfor %}
+    <button type="submit" class="ws-button success">
+      <i data-lucide="briefcase-business" class="w-4 h-4"></i>
+      确认写入影子持仓
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<script>
+  if (window.lucide) window.lucide.createIcons();
+</script>

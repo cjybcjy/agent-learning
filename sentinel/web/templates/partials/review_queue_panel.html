@@ -1,0 +1,168 @@
+{% if message %}
+<div class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800 text-sm font-bold mb-4">
+  {{ message }}
+</div>
+{% endif %}
+
+<div class="agent-toolbar">
+  <div>
+    <div class="agent-mode">
+      <i data-lucide="list-checks" class="w-4 h-4"></i>
+      待复核事项
+    </div>
+    <div class="text-xs text-slate-500 mt-1">
+      外部信号快照 -> Agent 建议 -> 手动确认/配置
+    </div>
+  </div>
+  <div class="control-row">
+    <button hx-post="/api/review-queue/collect"
+            hx-target="#review-queue-panel"
+            hx-swap="innerHTML"
+            class="ws-button ghost">
+      <i data-lucide="radio-tower" class="w-4 h-4"></i>
+      更新外部信号
+    </button>
+    <button hx-post="/api/review-queue/run"
+            hx-target="#review-queue-panel"
+            hx-swap="innerHTML"
+            class="ws-button ghost">
+      <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      刷新建议
+    </button>
+  </div>
+</div>
+
+<div class="metric-strip">
+  <div class="metric-tile">
+    <div class="metric-label">Agent 建议</div>
+    <div class="metric-value">{{ suggestions|length }}</div>
+  </div>
+  <div class="metric-tile">
+    <div class="metric-label">配置确认</div>
+    <div class="metric-value">{{ proposals|length }}</div>
+  </div>
+  <div class="metric-tile">
+    <div class="metric-label">外部信号</div>
+    <div class="metric-value">{{ run.source_mix.get("external_news", 0) if run else 0 }}</div>
+  </div>
+</div>
+
+{% set has_suggestions = suggestions %}
+{% if has_suggestions or proposals %}
+<div class="overflow-x-auto">
+  <table class="terminal-table">
+    <thead>
+      <tr>
+        <th>来源</th>
+        <th>建议</th>
+        <th>影响</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if has_suggestions %}
+      {% for suggestion in suggestions %}
+      {% set source_label = "外部信号 / Agent" if suggestion.category.startswith("external") else "Agent 建议" %}
+      <tr>
+        <td>
+          <span class="status-chip info">{{ source_label }}</span>
+          <div class="mono text-xs text-slate-500 mt-1">{{ suggestion.config_file }}</div>
+        </td>
+        <td>
+          <div class="font-semibold text-slate-700">{{ suggestion.title }}</div>
+          <div class="text-xs text-slate-500 mt-1">{{ suggestion.target }} · {{ suggestion.proposed_change }}</div>
+        </td>
+        <td>
+          <span class="status-chip {% if suggestion.impact == '高' %}warn{% else %}info{% endif %}">
+            {{ suggestion.impact }}
+          </span>
+          <div class="text-xs text-slate-500 mt-1">
+            {{ status_labels.get(suggestion.status, suggestion.status) }}
+          </div>
+        </td>
+        <td>
+          <div class="control-row">
+            <button hx-post="/api/review-queue/suggestions/{{ suggestion.id }}/queue-confirmation"
+                    hx-target="#review-queue-panel"
+                    hx-swap="innerHTML"
+                    class="ws-button primary">
+              <i data-lucide="list-checks" class="w-4 h-4"></i>
+              加入确认
+            </button>
+            <button hx-get="/api/config/load/{{ suggestion.config_file }}"
+                    hx-target="#config-editor-container"
+                    hx-swap="innerHTML"
+                    onclick="document.querySelector('#config-console')?.scrollIntoView({behavior: 'smooth', block: 'start'});"
+                    class="ws-button ghost">
+              <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i>
+              YAML
+            </button>
+            <button hx-post="/api/review-queue/suggestions/{{ suggestion.id }}/status"
+                    hx-vals='{"status":"watching"}'
+                    hx-target="#review-queue-panel"
+                    hx-swap="innerHTML"
+                    class="ws-button ghost">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+              观察
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      {% endif %}
+
+      {% for proposal in proposals %}
+      <tr>
+        <td>
+          <span class="status-chip {% if proposal.action == 'delete' %}warn{% else %}info{% endif %}">
+            配置确认
+          </span>
+          <div class="mono text-xs text-slate-500 mt-1">{{ proposal.config_file }}</div>
+        </td>
+        <td>
+          <div class="font-semibold text-slate-700">{{ proposal.title }}</div>
+          <div class="text-xs text-slate-500 mt-1">{{ proposal.path }}</div>
+        </td>
+        <td>
+          <span class="status-chip {% if proposal.action == 'delete' %}warn{% else %}info{% endif %}">
+            {{ action_labels.get(proposal.action, proposal.action) }}
+          </span>
+        </td>
+        <td>
+          <div class="control-row">
+            <button title="确认应用"
+                    aria-label="确认应用"
+                    hx-post="/api/review-queue/proposals/{{ proposal.id }}/approve"
+                    hx-target="#review-queue-panel"
+                    hx-swap="innerHTML"
+                    class="ws-button success">
+              <i data-lucide="check" class="w-4 h-4"></i>
+            </button>
+            <button title="搁置该条"
+                    aria-label="搁置该条"
+                    hx-post="/api/review-queue/proposals/{{ proposal.id }}/reject"
+                    hx-target="#review-queue-panel"
+                    hx-swap="innerHTML"
+                    class="ws-button ghost">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state min-h-[140px]">
+  <div>
+    <i data-lucide="shield-check" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
+    <div class="font-semibold text-slate-700">暂无待复核事项</div>
+    <div class="mt-1 text-xs text-slate-500">外部信号、Agent 建议和配置确认会汇总到这里</div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  if (window.lucide) window.lucide.createIcons();
+</script>

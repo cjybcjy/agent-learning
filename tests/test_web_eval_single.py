@@ -87,6 +87,8 @@ def test_decision_card_shows_technical_signal_panel(monkeypatch):
     assert "仅供研究" in response.text
     assert 'hx-post="/api/serenity-verification-plan"' in response.text
     assert "补证据路线" in response.text
+    assert 'hx-post="/api/paper_trade"' not in response.text
+    assert '"weight": 0.2' not in response.text
 
 
 def test_decision_card_explains_data_watermark_reasons(monkeypatch):

@@ -81,6 +81,19 @@ class TestGetMethod:
         assert "User-Agent" in call_kwargs["headers"]
         assert call_kwargs["timeout"] == 30
 
+    def test_get_supports_fast_timeout_and_zero_delay(self) -> None:
+        adapter = AntiBotAdapter(seed=42, request_timeout=2.5, delay_scale=0.0)
+        mock_resp = MagicMock(spec=requests.Response)
+        mock_resp.raise_for_status.return_value = None
+
+        with patch.object(adapter._session, "get", return_value=mock_resp) as mock_get:
+            with patch("sentinel.mgfs.data.anti_bot_adapter.time.sleep") as mock_sleep:
+                adapter.get("http://example.com")
+
+        assert adapter._compute_delay(consecutive_success=0) == 0.0
+        mock_sleep.assert_called_once_with(0.0)
+        assert mock_get.call_args[1]["timeout"] == 2.5
+
     def test_get_connection_error_resets_success(self) -> None:
         adapter = AntiBotAdapter(seed=42)
         adapter._consecutive_success = 5

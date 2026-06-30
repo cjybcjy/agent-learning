@@ -101,7 +101,7 @@ class TradingAgentsRunner:
         market: str,
         sector: str | None,
     ) -> TradingAgentsFundamentalReport:
-        isolated_python = os.environ.get("TRADINGAGENTS_PYTHON")
+        isolated_python = _configured_isolated_python()
         if isolated_python:
             return self._run_isolated(
                 python_bin=isolated_python,
@@ -385,6 +385,17 @@ def _sanitize_unavailable_reason(message: str) -> str:
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
+
+
+def _configured_isolated_python() -> str | None:
+    explicit = os.environ.get("TRADINGAGENTS_PYTHON")
+    if explicit:
+        return explicit
+
+    candidate = _repo_root() / ".venv-tradingagents" / "bin" / "python"
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return str(candidate)
+    return None
 
 
 def _default_helper_script() -> str:

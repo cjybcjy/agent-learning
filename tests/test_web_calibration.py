@@ -104,7 +104,7 @@ def test_calibration_page_shows_empty_state(tmp_path, monkeypatch):
         client = TestClient(create_app())
         response = client.get("/api/calibration/reports")
         assert response.status_code == 200
-        assert "暂无校准数据" in response.text
+        assert "暂无回测数据" in response.text
 
 
 def test_calibration_report_uses_stock_name_code_format(tmp_path, monkeypatch):

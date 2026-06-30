@@ -67,10 +67,30 @@ def _reset_runtime_services_after_metric_backfill() -> None:
 @router.post("/candidates/discover", response_class=HTMLResponse)
 async def discover_candidates(
     request: Request,
+    background: BackgroundTasks,
     theme: str = Form(""),
+    roles: str = Form(""),
+    policy: str = Form("neutral"),
+    fund_rank_limit: str = Form(""),
+    discovery_mode: str = Form("objective"),
 ):
     if not theme.strip():
         return HTMLResponse("<div class='empty-state min-h-[120px]'>请先选择宏观主题</div>")
+    if discovery_mode == "scan":
+        target_roles = [r.strip() for r in roles.split(",") if r.strip()] or None
+        parsed_fund_rank_limit = _parse_optional_positive_int(fund_rank_limit)
+        task_id = create_task(theme)
+        background.add_task(
+            run_scan_task,
+            task_id,
+            theme,
+            target_roles,
+            policy,
+            parsed_fund_rank_limit,
+        )
+        return request.app.state.templates.get_template(
+            "partials/scan_task_started.html"
+        ).render({"request": request, "task_id": task_id})
     result = CandidateDiscoveryService().discover_theme(theme)
     return request.app.state.templates.get_template(
         "partials/candidate_discovery.html"

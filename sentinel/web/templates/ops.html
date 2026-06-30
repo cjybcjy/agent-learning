@@ -2,51 +2,110 @@
 {% block content %}
 
 <div class="workstation-layout-relaxed">
-  <section class="workflow-guide">
-    <div class="workflow-guide-header">
-      <div class="workflow-guide-title">
-        <i data-lucide="route" class="w-4 h-4"></i>
-        工作流导览
+  <section class="workflow-guide logic-map">
+    <div class="logic-map-header">
+      <div class="logic-map-title">
+        <i data-lucide="git-branch-plus" class="w-4 h-4"></i>
+        MGFS 治理链路
       </div>
-      <div class="workflow-guide-caption">先让 Agent 扩大信息面，再进入人工配置</div>
+      <div class="logic-map-caption">把外部信号、Agent 建议、人工配置和批量验证分开呈现</div>
     </div>
-    <nav class="workflow-steps" aria-label="MGFS 运维工作流">
-      <a class="workflow-step" href="#daily-research-agent">
-        <span class="workflow-step-title">1 每日研究 Agent</span>
-        <span class="workflow-step-note">生成证据、反证和配置建议</span>
+    <nav class="logic-flow-track ops-flow" aria-label="MGFS 运维工作流">
+      <a class="logic-node workflow-step" href="#review-queue">
+        <span class="logic-node-index">01</span>
+        <span class="logic-node-title workflow-step-title">1 待复核事项</span>
+        <span class="logic-node-copy workflow-step-note">把外部信号、Agent 建议和配置确认合并成一张人工队列。</span>
+        <span class="logic-node-meta">
+          <span>输入: snapshot + suggestion + proposal</span>
+          <span>输出: review queue</span>
+        </span>
       </a>
-      <a class="workflow-step" href="#config-console">
-        <span class="workflow-step-title">2 配置规则</span>
-        <span class="workflow-step-note">人工确认后维护 YAML 配置</span>
+      <a class="logic-node workflow-step" href="#config-console">
+        <span class="logic-node-index">02</span>
+        <span class="logic-node-title workflow-step-title">2 配置规则</span>
+        <span class="logic-node-copy workflow-step-note">配置控制台承接人工判断，Schema 校验通过后才保存 YAML。</span>
+        <span class="logic-node-meta">
+          <span>判断: approve / reject / edit</span>
+          <span>输出: 可热加载配置</span>
+        </span>
       </a>
-      <a class="workflow-step" href="#pipeline-monitor">
-        <span class="workflow-step-title">3 执行巡检</span>
-        <span class="workflow-step-note">触发大盘扫描并查看批次</span>
+      <a class="logic-node workflow-step" href="#pipeline-monitor">
+        <span class="logic-node-index">03</span>
+        <span class="logic-node-title workflow-step-title">3 执行巡检</span>
+        <span class="logic-node-copy workflow-step-note">Pipeline 读取股票池，逐标的运行 MGFS 评分并保存批次结果。</span>
+        <span class="logic-node-meta">
+          <span>输入: moat_static_base</span>
+          <span>输出: pipeline batch</span>
+        </span>
       </a>
-      <a class="workflow-step" href="#historical-backtest-panel">
-        <span class="workflow-step-title">4 历史回测</span>
-        <span class="workflow-step-note">把研究可信度和校准结果放在同一面板</span>
+      <a class="logic-node workflow-step" href="#historical-backtest-panel">
+        <span class="logic-node-index">04</span>
+        <span class="logic-node-title workflow-step-title">4 历史回测</span>
+        <span class="logic-node-copy workflow-step-note">回测和研究工件校验回答“评分是否可信、是否有未来函数污染”。</span>
+        <span class="logic-node-meta">
+          <span>验证: point-in-time</span>
+          <span>输出: 回测可信度</span>
+        </span>
+      </a>
+      <a class="logic-node workflow-step" href="#config-console">
+        <span class="logic-node-index">05</span>
+        <span class="logic-node-title workflow-step-title">5 回写假设</span>
+        <span class="logic-node-copy workflow-step-note">回测结果不会自动改分，只作为下一轮 YAML 复核输入。</span>
+        <span class="logic-node-meta">
+          <span>边界: research_only</span>
+          <span>输出: 人工决策</span>
+        </span>
       </a>
     </nav>
+    <div class="logic-layer-grid">
+      <div class="logic-layer">
+        <div class="logic-layer-title">
+          <i data-lucide="radio-tower" class="w-4 h-4"></i>
+          信号快照层
+        </div>
+        <div class="logic-layer-copy">外部政策、公告和人工补充先落成 snapshot，Agent 只读取快照，不直接触碰配置。</div>
+      </div>
+      <div class="logic-layer">
+        <div class="logic-layer-title">
+          <i data-lucide="circle-check-big" class="w-4 h-4"></i>
+          人工确认层
+        </div>
+        <div class="logic-boundary">所有配置变更都需要进入 approve / reject / edit 路径；外部信号只能提出复核问题。</div>
+      </div>
+      <div class="logic-layer">
+        <div class="logic-layer-title">
+          <i data-lucide="test-tube-diagonal" class="w-4 h-4"></i>
+          验证闭环层
+        </div>
+        <div class="logic-chip-row">
+          <span class="logic-chip info">Pipeline</span>
+          <span class="logic-chip good">Backtest</span>
+          <span class="logic-chip warn">Evidence</span>
+          <span class="logic-chip">Artifacts</span>
+        </div>
+        <div class="logic-layer-copy">运行结果、工件校验和回测可信度共同决定下一轮假设是否值得修改。</div>
+      </div>
+    </div>
   </section>
 
-  <section id="daily-research-agent" class="workstation-panel daily-agent-panel">
+  <section id="review-queue" class="workstation-panel daily-agent-panel">
     <div class="panel-header">
       <div class="panel-title">
-        <i data-lucide="brain-circuit" class="w-4 h-4"></i>
-        每日研究 Agent
+        <i data-lucide="list-checks" class="w-4 h-4"></i>
+        待复核事项
       </div>
-      <span class="panel-caption">Read-only Advisory</span>
+      <span class="panel-caption">Review Queue</span>
     </div>
     <div class="panel-body">
-      <div hx-get="/api/research-agent/panel"
+      <div hx-get="/api/review-queue/panel"
            hx-trigger="load"
            hx-swap="innerHTML"
-           id="research-agent-panel">
+           id="review-queue-panel">
         <div class="empty-state min-h-[220px]">
           <div>
             <i data-lucide="loader-circle" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
-            <div class="font-semibold text-slate-700">研究 Agent 加载中</div>
+            <div class="font-semibold text-slate-700">待复核事项加载中</div>
+            <div class="mt-2 text-xs text-slate-500">来源 / 建议 / 影响 / 操作</div>
           </div>
         </div>
       </div>
@@ -79,19 +138,6 @@
       </div>
       <div class="mb-3 text-xs font-semibold text-slate-500">
         保存前会先执行 YAML 与 MGFS Schema 校验，失败时会显示具体字段路径。
-      </div>
-
-      <div id="config-proposal-panel"
-           class="mb-5"
-           hx-get="/api/config/proposals/panel"
-           hx-trigger="load"
-           hx-swap="innerHTML">
-        <div class="empty-state min-h-[140px]">
-          <div>
-            <i data-lucide="loader-circle" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
-            <div class="font-semibold text-slate-700">半自动确认加载中</div>
-          </div>
-        </div>
       </div>
 
       <div class="control-row mb-4">
@@ -177,15 +223,44 @@
       </div>
       <span class="panel-caption">Backtest Evidence</span>
     </div>
-    <div class="panel-body"
-         hx-get="/api/calibration/reports"
-         hx-trigger="load"
-         hx-swap="innerHTML"
-         id="historical-backtest-content">
-      <div class="empty-state min-h-[180px]">
-        <div>
-          <i data-lucide="loader-circle" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
-          <div class="font-semibold text-slate-700">历史回测加载中</div>
+    <div class="panel-body">
+      <form id="backtest-window-form"
+            class="control-row mb-4"
+            hx-get="/api/calibration/reports"
+            hx-target="#historical-backtest-content"
+            hx-swap="innerHTML"
+            aria-label="回测窗口">
+        <label class="text-xs font-bold text-slate-500 uppercase tracking-wide" for="backtest-start-date">
+          起点
+        </label>
+        <input id="backtest-start-date"
+               name="start_date"
+               type="date"
+               value="{{ default_backtest_start_date }}"
+               class="ws-input mono">
+        <label class="text-xs font-bold text-slate-500 uppercase tracking-wide" for="backtest-end-date">
+          终点
+        </label>
+        <input id="backtest-end-date"
+               name="end_date"
+               type="date"
+               value="{{ default_backtest_end_date }}"
+               class="ws-input mono">
+        <button type="submit" class="ws-button primary">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          运行回测
+        </button>
+      </form>
+      <div hx-get="/api/calibration/reports"
+           hx-trigger="load"
+           hx-include="#backtest-window-form"
+           hx-swap="innerHTML"
+           id="historical-backtest-content">
+        <div class="empty-state min-h-[180px]">
+          <div>
+            <i data-lucide="loader-circle" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
+            <div class="font-semibold text-slate-700">历史回测加载中</div>
+          </div>
         </div>
       </div>
     </div>

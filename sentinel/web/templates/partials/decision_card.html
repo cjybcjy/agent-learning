@@ -20,16 +20,6 @@
       <h3 class="text-xl font-black leading-tight mt-1">{{ emoji }} {{ decision.target.symbol }} — {{ decision.rating }}</h3>
       <div class="text-sm text-slate-500 mt-1">{{ decision.target.name or decision.target.symbol }} · {{ decision.target.sector or "未分组" }}</div>
     </div>
-    {% if decision.rating in ["Strong Buy", "Accumulate"] %}
-    <button hx-post="/api/paper_trade"
-            hx-vals='{"symbol": "{{ decision.target.symbol }}", "name": "{{ decision.target.name or decision.target.symbol }}", "sector": "{{ decision.target.sector or '' }}", "price": {{ decision.report_sections.get("latest_close", 0) or 100 }}, "weight": 0.2}'
-            hx-swap="outerHTML"
-            class="ws-button primary text-xs"
-            title="虚拟买入并追踪止损">
-      <i data-lucide="briefcase-business" class="w-4 h-4"></i>
-      影子持仓
-    </button>
-    {% endif %}
   </div>
 
   <div class="p-4">

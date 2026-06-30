@@ -55,18 +55,27 @@ class EastmoneyKlineFetcher(PriceFetcher):
     BASE_DELAY = 1.0
     MAX_DELAY = 8.0
 
-    def __init__(self, seed: int | None = None) -> None:
+    def __init__(
+        self,
+        seed: int | None = None,
+        request_timeout: float = 30.0,
+        max_retries: int | None = None,
+        delay_scale: float = 1.0,
+    ) -> None:
         self._rng = random.Random(seed)
+        self._request_timeout = request_timeout
+        self._max_retries = self.MAX_RETRIES if max_retries is None else max_retries
+        self._delay_scale = delay_scale
         self._session = requests.Session()
         self._session.headers.update(_DEFAULT_HEADERS)
 
     def _random_delay(self) -> None:
-        delay = self._rng.uniform(1.0, 4.0)
+        delay = self._rng.uniform(1.0, 4.0) * self._delay_scale
         time.sleep(delay)
 
     def _retry_with_backoff(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         last_exc: Exception | None = None
-        for attempt in range(self.MAX_RETRIES):
+        for attempt in range(self._max_retries):
             try:
                 self._random_delay()
                 return func(*args, **kwargs)
@@ -76,32 +85,32 @@ class EastmoneyKlineFetcher(PriceFetcher):
                 resp = exc.response
                 if resp is not None and resp.status_code < 500:
                     raise
-                if attempt == self.MAX_RETRIES - 1:
+                if attempt == self._max_retries - 1:
                     raise
                 delay = min(
                     self.BASE_DELAY * (2**attempt) + self._rng.uniform(0, 1),
                     self.MAX_DELAY,
-                )
+                ) * self._delay_scale
                 logger.warning(
                     "Eastmoney HTTP %s (attempt %d/%d), retrying in %.1fs",
                     resp.status_code if resp is not None else "?",
                     attempt + 1,
-                    self.MAX_RETRIES,
+                    self._max_retries,
                     delay,
                 )
                 time.sleep(delay)
             except (requests.ConnectionError, requests.Timeout) as exc:
                 last_exc = exc
-                if attempt == self.MAX_RETRIES - 1:
+                if attempt == self._max_retries - 1:
                     raise
                 delay = min(
                     self.BASE_DELAY * (2**attempt) + self._rng.uniform(0, 1),
                     self.MAX_DELAY,
-                )
+                ) * self._delay_scale
                 logger.warning(
                     "Eastmoney request failed (attempt %d/%d), retrying in %.1fs: %s",
                     attempt + 1,
-                    self.MAX_RETRIES,
+                    self._max_retries,
                     delay,
                     exc,
                 )
@@ -132,7 +141,7 @@ class EastmoneyKlineFetcher(PriceFetcher):
         return "1", symbol
 
     def _do_request(self, url: str) -> dict[str, Any]:
-        resp = self._session.get(url, timeout=30)
+        resp = self._session.get(url, timeout=self._request_timeout)
         resp.raise_for_status()
         return resp.json()
 

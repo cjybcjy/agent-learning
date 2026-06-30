@@ -44,8 +44,16 @@ _UA_POOL = [
 
 
 class AntiBotAdapter:
-    def __init__(self, use_curl_cffi: bool = False, seed: int | None = None) -> None:
+    def __init__(
+        self,
+        use_curl_cffi: bool = False,
+        seed: int | None = None,
+        request_timeout: float = 30.0,
+        delay_scale: float = 1.0,
+    ) -> None:
         self._rng = random.Random(seed)
+        self._request_timeout = request_timeout
+        self._delay_scale = delay_scale
         self._session = requests.Session()
         self._curl_session: Any | None = None
         if use_curl_cffi:
@@ -64,14 +72,14 @@ class AntiBotAdapter:
     def _compute_delay(self, consecutive_success: int = 0) -> float:
         now = time.time()
         if now < self._ban_until:
-            return self._rng.uniform(2.0, 8.0)
+            return self._rng.uniform(2.0, 8.0) * self._delay_scale
         if consecutive_success == 0:
-            return self._rng.uniform(2.0, 5.0)
+            return self._rng.uniform(2.0, 5.0) * self._delay_scale
         if consecutive_success >= 10:
-            return self._rng.uniform(0.5, 1.5)
+            return self._rng.uniform(0.5, 1.5) * self._delay_scale
         if consecutive_success > 0 and consecutive_success % 7 == 0:
-            return self._rng.uniform(5.0, 10.0)
-        return self._rng.uniform(0.8, 2.5)
+            return self._rng.uniform(5.0, 10.0) * self._delay_scale
+        return self._rng.uniform(0.8, 2.5) * self._delay_scale
 
     def _apply_ban(self, duration: float = 60.0) -> None:
         self._ban_until = time.time() + duration
@@ -90,14 +98,20 @@ class AntiBotAdapter:
         time.sleep(delay)
 
         try:
-            resp = self._session.get(url, headers=headers, timeout=30, **kwargs)
+            timeout = kwargs.pop("timeout", self._request_timeout)
+            resp = self._session.get(url, headers=headers, timeout=timeout, **kwargs)
             resp.raise_for_status()
         except requests.HTTPError as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             if status in (403, 429):
                 self._apply_ban()
                 if self._curl_session is not None:
-                    resp = self._curl_session.get(url, headers=headers, timeout=30, **kwargs)
+                    resp = self._curl_session.get(
+                        url,
+                        headers=headers,
+                        timeout=self._request_timeout,
+                        **kwargs,
+                    )
                     resp.raise_for_status()
                     self._consecutive_success += 1
                     return resp

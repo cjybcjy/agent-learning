@@ -161,6 +161,24 @@ class TestEastmoneyKlineFetcherFetchOHLCV:
 
     @patch("time.sleep")
     @patch("requests.Session.get")
+    def test_fetch_ohlcv_can_fail_fast_for_ui_refresh(self, mock_get: Any, mock_sleep: Any) -> None:
+        mock_get.side_effect = requests.ConnectionError("Connection reset")
+
+        fetcher = EastmoneyKlineFetcher(
+            seed=42,
+            request_timeout=2.5,
+            max_retries=1,
+            delay_scale=0.0,
+        )
+        with pytest.raises(requests.ConnectionError):
+            fetcher.fetch_ohlcv("600519", Market.A_SHARE, days=120)
+
+        assert mock_get.call_count == 1
+        assert mock_get.call_args[1]["timeout"] == 2.5
+        mock_sleep.assert_called_once_with(0.0)
+
+    @patch("time.sleep")
+    @patch("requests.Session.get")
     def test_fetch_ohlcv_limits_to_days(self, mock_get: Any, mock_sleep: Any) -> None:
         klines = [f"2024-01-{i:02d},100.0,101.0,102.0,99.0,10000,1000000.00,1.00,1.00,1.00,0.10" for i in range(1, 21)]
         mock_get.return_value = FakeResponse(json_data={

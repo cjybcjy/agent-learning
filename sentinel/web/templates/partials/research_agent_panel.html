@@ -123,6 +123,14 @@
     </div>
 
     <div class="agent-actions">
+      <button hx-post="/api/research-agent/suggestions/{{ suggestion.id }}/queue-confirmation"
+              hx-target="#config-proposal-panel"
+              hx-swap="innerHTML"
+              onclick="document.querySelector('#config-console')?.scrollIntoView({behavior: 'smooth', block: 'start'});"
+              class="ws-button primary">
+        <i data-lucide="list-checks" class="w-4 h-4"></i>
+        加入确认名单
+      </button>
       <button type="button"
               hx-get="/api/config/load/{{ suggestion.config_file }}"
               hx-target="#config-editor-container"
@@ -130,7 +138,7 @@
               onclick="document.querySelector('#config-console')?.scrollIntoView({behavior: 'smooth', block: 'start'});"
               class="ws-button ghost">
         <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i>
-        跳转处理
+        打开 YAML
       </button>
       <button hx-post="/api/research-agent/suggestions/{{ suggestion.id }}/status"
               hx-vals='{"status":"queued"}'
@@ -165,7 +173,7 @@
   <div>
     <i data-lucide="shield-check" class="w-8 h-8 mx-auto mb-3 text-slate-400"></i>
     <div class="font-semibold text-slate-700">今日未发现明显配置偏差</div>
-    <div class="mt-1 text-xs text-slate-500">保持人工复核节奏，等待下一轮流水线和校准报告</div>
+    <div class="mt-1 text-xs text-slate-500">保持人工复核节奏，等待下一轮流水线和回测可信度报告</div>
   </div>
 </div>
 {% endif %}

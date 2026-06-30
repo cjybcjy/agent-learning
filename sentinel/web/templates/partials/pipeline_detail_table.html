@@ -19,7 +19,6 @@
             <th>最终得分</th>
             <th>评级</th>
             <th>建议</th>
-            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -45,19 +44,6 @@
               </span>
             </td>
             <td class="text-xs text-slate-600">{{ r.action }}</td>
-            <td>
-              {% if r.rating in ["Strong Buy", "Accumulate"] %}
-              <button hx-post="/api/paper_trade"
-                      hx-vals='{"symbol": "{{ r.symbol }}", "name": "{{ r.name or r.symbol }}", "sector": "", "price": 100.0, "weight": 0.2}'
-                      hx-swap="outerHTML"
-                      class="ws-button primary text-xs"
-                      title="虚拟买入并追踪止损">
-                影子
-              </button>
-              {% else %}
-              <span class="text-slate-300">—</span>
-              {% endif %}
-            </td>
           </tr>
           {% endfor %}
         </tbody>

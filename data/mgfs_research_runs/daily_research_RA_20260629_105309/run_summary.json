@@ -1,0 +1,18 @@
+{
+  "adapter_status": {
+    "instruction_boundary": "research_only",
+    "point_in_time_inputs": "daily_research_snapshot",
+    "research_signal_schema": "mgfs_research_signal_v1"
+  },
+  "borrowed_from": {
+    "patterns": [
+      "agent_discussion",
+      "research_signal_jsonl"
+    ],
+    "repo": "utopia"
+  },
+  "decision_count": 0,
+  "ok": true,
+  "run_id": "RA_20260629_105309",
+  "symbol_count": 0
+}

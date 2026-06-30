@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
+from sentinel.domain.models import Market
 from sentinel.mgfs.execution.stop_loss_monitor import StopLossMonitor
 from sentinel.mgfs.evolution.backtest_cli import _run_backtest
 from sentinel.mgfs.storage.mgfs_repository import MGFSRepository
@@ -17,14 +18,21 @@ from sentinel.web.services.research_agent_service import ResearchAgentService
 from sentinel.web.services.research_signal_collector_service import (
     ResearchSignalCollectorService,
 )
+from sentinel.web.services.shadow_position_service import (
+    ManualShadowCandidate,
+    ShadowPositionSimulatorService,
+)
 
 router = APIRouter()
+DEFAULT_BACKTEST_START_DATE = "2025-01-01"
+DEFAULT_BACKTEST_END_DATE = "2025-06-30"
 _pipeline_svc: PipelineService | None = None
 _sl_monitor: StopLossMonitor | None = None
 _repo_instance: MGFSRepository | None = None
 _research_agent_svc: ResearchAgentService | None = None
 _config_change_svc: ConfigChangeService | None = None
 _signal_collector_svc: ResearchSignalCollectorService | None = None
+_shadow_position_svc: ShadowPositionSimulatorService | None = None
 
 
 def _get_repository() -> MGFSRepository:
@@ -66,8 +74,15 @@ def _get_signal_collector_service() -> ResearchSignalCollectorService:
     return _signal_collector_svc
 
 
+def _get_shadow_position_service() -> ShadowPositionSimulatorService:
+    global _shadow_position_svc
+    if _shadow_position_svc is None:
+        _shadow_position_svc = ShadowPositionSimulatorService()
+    return _shadow_position_svc
+
+
 def _reset_runtime_services() -> None:
-    global _pipeline_svc, _sl_monitor, _repo_instance
+    global _pipeline_svc, _sl_monitor, _repo_instance, _shadow_position_svc
     import sentinel.web.dependencies as deps
 
     deps._orchestrator = None
@@ -75,6 +90,7 @@ def _reset_runtime_services() -> None:
     _pipeline_svc = None
     _sl_monitor = None
     _repo_instance = None
+    _shadow_position_svc = None
 
 
 def _get_stop_loss_monitor() -> StopLossMonitor:
@@ -132,9 +148,152 @@ def _render_config_proposal_panel(
     )
 
 
+def _render_review_queue_panel(
+    request: Request,
+    run=None,
+    message: str | None = None,
+):
+    if run is None:
+        run = _get_research_agent_service().ensure_daily_review()
+    return request.app.state.templates.get_template(
+        "partials/review_queue_panel.html"
+    ).render(
+        {
+            "request": request,
+            "run": run,
+            "suggestions": [
+                item
+                for item in (run.suggestions if run else [])
+                if item.status != "rejected"
+            ],
+            "proposals": _get_config_change_service().scan_proposals(),
+            "message": message,
+            "status_labels": {
+                "pending": "待处理",
+                "queued": "已加入确认",
+                "watching": "观察中",
+                "rejected": "已搁置",
+            },
+            "action_labels": {
+                "add": "添加",
+                "delete": "删除",
+            },
+        }
+    )
+
+
 # ------------------------------------------------------------------
 # Daily Research Agent (read-only config suggestions)
 # ------------------------------------------------------------------
+
+
+@router.get("/review-queue/panel", response_class=HTMLResponse)
+async def review_queue_panel(request: Request):
+    _get_signal_collector_service().ensure_daily_snapshot()
+    return _render_review_queue_panel(request)
+
+
+@router.post("/review-queue/run", response_class=HTMLResponse)
+async def review_queue_run(request: Request):
+    run = _get_research_agent_service().run_daily_review()
+    return _render_review_queue_panel(
+        request,
+        run=run,
+        message=f"已刷新 {len(run.suggestions)} 条 Agent 建议",
+    )
+
+
+@router.post("/review-queue/collect", response_class=HTMLResponse)
+async def review_queue_collect(request: Request):
+    snapshot = _get_signal_collector_service().collect()
+    run = _get_research_agent_service().run_daily_review()
+    return _render_review_queue_panel(
+        request,
+        run=run,
+        message=f"外部信号已更新：{len(snapshot.get('items', []))} 条",
+    )
+
+
+@router.post(
+    "/review-queue/suggestions/{suggestion_id}/status",
+    response_class=HTMLResponse,
+)
+async def review_queue_update_suggestion_status(
+    request: Request,
+    suggestion_id: str,
+    status: str = Form(...),
+):
+    service = _get_research_agent_service()
+    try:
+        updated = service.update_suggestion_status(suggestion_id, status)
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>{str(exc)}</div>",
+            status_code=400,
+        )
+    return _render_review_queue_panel(
+        request,
+        run=service.load_latest_run(),
+        message=f"{updated.title} 已更新为 {updated.status}",
+    )
+
+
+@router.post(
+    "/review-queue/suggestions/{suggestion_id}/queue-confirmation",
+    response_class=HTMLResponse,
+)
+async def review_queue_queue_confirmation(request: Request, suggestion_id: str):
+    agent_service = _get_research_agent_service()
+    run = agent_service.load_latest_run() or agent_service.ensure_daily_review()
+    suggestion = next(
+        (item for item in run.suggestions if item.id == suggestion_id),
+        None,
+    )
+    if suggestion is None:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>未找到建议: {suggestion_id}</div>",
+            status_code=404,
+        )
+    try:
+        proposals = _get_config_change_service().queue_agent_suggestion(suggestion)
+        agent_service.update_suggestion_status(suggestion_id, "queued")
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>{str(exc)}</div>",
+            status_code=400,
+        )
+    return _render_review_queue_panel(
+        request,
+        run=agent_service.load_latest_run(),
+        message=f"{suggestion.title} 已加入确认队列（{len(proposals)} 项）",
+    )
+
+
+@router.post("/review-queue/proposals/{proposal_id}/approve", response_class=HTMLResponse)
+async def review_queue_proposal_approve(request: Request, proposal_id: str):
+    service = _get_config_change_service()
+    try:
+        proposal = service.approve_proposal(proposal_id)
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>{str(exc)}</div>",
+            status_code=400,
+        )
+    _reset_runtime_services()
+    return _render_review_queue_panel(request, message=f"{proposal.title} 已应用")
+
+
+@router.post("/review-queue/proposals/{proposal_id}/reject", response_class=HTMLResponse)
+async def review_queue_proposal_reject(request: Request, proposal_id: str):
+    service = _get_config_change_service()
+    try:
+        proposal = service.reject_proposal(proposal_id)
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>{str(exc)}</div>",
+            status_code=400,
+        )
+    return _render_review_queue_panel(request, message=f"{proposal.title} 已搁置")
 
 
 @router.get("/research-agent/panel", response_class=HTMLResponse)
@@ -195,6 +354,44 @@ async def research_agent_update_suggestion_status(
         request,
         run=run,
         message=f"{updated.title} {status_labels[updated.status]}",
+    )
+
+
+@router.post(
+    "/research-agent/suggestions/{suggestion_id}/queue-confirmation",
+    response_class=HTMLResponse,
+)
+async def research_agent_queue_confirmation(request: Request, suggestion_id: str):
+    agent_service = _get_research_agent_service()
+    run = agent_service.load_latest_run()
+    if run is None:
+        return HTMLResponse(
+            "<div class='text-red-600 text-sm'>还没有可加入确认名单的 Agent 运行记录</div>",
+            status_code=400,
+        )
+
+    suggestion = next(
+        (item for item in run.suggestions if item.id == suggestion_id),
+        None,
+    )
+    if suggestion is None:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>未找到建议: {suggestion_id}</div>",
+            status_code=404,
+        )
+
+    change_service = _get_config_change_service()
+    try:
+        proposals = change_service.queue_agent_suggestion(suggestion)
+        agent_service.update_suggestion_status(suggestion_id, "queued")
+    except ValueError as exc:
+        return HTMLResponse(
+            f"<div class='text-red-600 text-sm'>{str(exc)}</div>",
+            status_code=400,
+        )
+    return _render_config_proposal_panel(
+        request,
+        message=f"{suggestion.title} 已加入半自动确认名单（{len(proposals)} 项）",
     )
 
 
@@ -391,59 +588,196 @@ async def risk_dismiss(
     ).render({"request": request, "alerts": alerts})
 
 
-# ------------------------------------------------------------------
-# Paper Trading Dock (shadow position)
-# ------------------------------------------------------------------
+def _form_values(form, key: str) -> list[str]:
+    return [str(value) for value in form.getlist(key)]
 
-@router.post("/paper_trade", response_class=HTMLResponse)
-async def paper_trade(
-    request: Request,
-    symbol: str = Form(...),
-    name: str = Form(...),
-    sector: str = Form(""),
-    price: float = Form(...),
-    weight: float = Form(...),
-):
-    if price <= 0:
-        return HTMLResponse(
-            "<span class='text-red-600 text-xs'>价格必须大于 0</span>",
-            status_code=400,
-        )
-    repo = _get_repository()
-    repo.save_active_holding(
-        symbol=symbol,
-        name=name,
-        sector=sector or None,
-        entry_price=price,
-        current_price=price,
-        highest_price=price,
-        weight=weight,
-        stop_loss_hard=-0.20,
-        stop_loss_trailing=-0.15,
-        portfolio_stop_loss=-0.10,
+
+def _float_or_none(value: str | None) -> float | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _market_from_form(value: str | None) -> Market:
+    if value and value in Market.__members__:
+        return Market[value]
+    return Market.A_SHARE
+
+
+def _shadow_candidates_from_form(form) -> list[ManualShadowCandidate]:
+    symbols = _form_values(form, "symbol")
+    names = _form_values(form, "name")
+    sectors = _form_values(form, "sector")
+    final_scores = _form_values(form, "final_score")
+    payoff_ratios = _form_values(form, "payoff_ratio")
+    prices = _form_values(form, "price")
+    candidates: list[ManualShadowCandidate] = []
+    row_count = max(
+        len(symbols), len(names), len(sectors),
+        len(final_scores), len(payoff_ratios), len(prices),
     )
-    return request.app.state.templates.get_template(
-        "partials/paper_trade_success.html"
+    for idx in range(row_count):
+        symbol = symbols[idx].strip() if idx < len(symbols) else ""
+        name = names[idx].strip() if idx < len(names) else ""
+        sector = sectors[idx].strip() if idx < len(sectors) else ""
+        final_score = _float_or_none(final_scores[idx] if idx < len(final_scores) else None)
+        payoff_ratio = _float_or_none(payoff_ratios[idx] if idx < len(payoff_ratios) else None)
+        price = _float_or_none(prices[idx] if idx < len(prices) else None)
+        if not any([symbol, name, sector, final_score is not None, payoff_ratio is not None, price is not None]):
+            continue
+        candidates.append(
+            ManualShadowCandidate(
+                symbol=symbol,
+                name=name or symbol,
+                sector=sector,
+                final_score=final_score if final_score is not None else -1.0,
+                payoff_ratio=payoff_ratio if payoff_ratio is not None else -1.0,
+                price=price,
+            )
+        )
+    return candidates
+
+
+def _shadow_holdings(service: ShadowPositionSimulatorService) -> list[dict]:
+    return service.repository.list_active_holdings()
+
+
+def _shadow_alerts(service: ShadowPositionSimulatorService):
+    return StopLossMonitor(service.repository).scan()
+
+
+def _render_shadow_holdings(
+    request: Request,
+    service: ShadowPositionSimulatorService,
+    *,
+    message: str | None = None,
+    refresh_result=None,
+    status_code: int = 200,
+) -> HTMLResponse:
+    html = request.app.state.templates.get_template(
+        "partials/shadow_position_holdings.html"
     ).render(
         {
             "request": request,
-            "symbol": symbol,
-            "name": name,
-            "price": price,
-            "weight": weight,
+            "holdings": _shadow_holdings(service),
+            "alerts": _shadow_alerts(service),
+            "message": message,
+            "refresh_result": refresh_result,
+        }
+    )
+    return HTMLResponse(html, status_code=status_code)
+
+
+@router.get("/shadow-positions/panel", response_class=HTMLResponse)
+async def shadow_positions_panel(request: Request):
+    service = _get_shadow_position_service()
+    return request.app.state.templates.get_template(
+        "partials/shadow_position_panel.html"
+    ).render(
+        {
+            "request": request,
+            "holdings": _shadow_holdings(service),
+            "alerts": _shadow_alerts(service),
+            "refresh_result": None,
         }
     )
 
 
+@router.post("/shadow-positions/preview", response_class=HTMLResponse)
+async def shadow_positions_preview(request: Request):
+    form = await request.form()
+    service = _get_shadow_position_service()
+    preview = service.preview_candidates(
+        _shadow_candidates_from_form(form),
+        market=_market_from_form(str(form.get("market") or "")),
+    )
+    return request.app.state.templates.get_template(
+        "partials/shadow_position_preview.html"
+    ).render({"request": request, "preview": preview})
+
+
+@router.post("/shadow-positions/confirm", response_class=HTMLResponse)
+async def shadow_positions_confirm(request: Request):
+    form = await request.form()
+    service = _get_shadow_position_service()
+    service.confirm_candidates(
+        _shadow_candidates_from_form(form),
+        market=_market_from_form(str(form.get("market") or "")),
+    )
+    return _render_shadow_holdings(
+        request,
+        service,
+        message="已写入影子持仓",
+    )
+
+
+@router.post("/shadow-positions/{symbol}/cost", response_class=HTMLResponse)
+async def shadow_positions_update_cost(
+    request: Request,
+    symbol: str,
+    entry_price: float = Form(...),
+):
+    service = _get_shadow_position_service()
+    try:
+        service.update_holding_cost(symbol, entry_price)
+    except ValueError as exc:
+        return _render_shadow_holdings(
+            request,
+            service,
+            message=str(exc),
+            status_code=400,
+        )
+    return _render_shadow_holdings(
+        request,
+        service,
+        message=f"{symbol} 成本价已更新",
+    )
+
+
+@router.post("/shadow-positions/{symbol}/delete", response_class=HTMLResponse)
+async def shadow_positions_delete(request: Request, symbol: str):
+    service = _get_shadow_position_service()
+    service.delete_holding(symbol)
+    return _render_shadow_holdings(
+        request,
+        service,
+        message=f"{symbol} 已删除",
+    )
+
+
+@router.post("/shadow-positions/cleanup-legacy", response_class=HTMLResponse)
+async def shadow_positions_cleanup_legacy(request: Request):
+    service = _get_shadow_position_service()
+    removed = service.cleanup_legacy_holdings()
+    return _render_shadow_holdings(
+        request,
+        service,
+        message=f"已清理旧影子持仓 {len(removed)} 条",
+    )
+
+
+@router.post("/shadow-positions/refresh", response_class=HTMLResponse)
+async def shadow_positions_refresh(
+    request: Request,
+    source: str = Form("manual"),
+):
+    service = _get_shadow_position_service()
+    result = service.refresh_active_holdings(source=source)
+    return _render_shadow_holdings(request, service, refresh_result=result)
+
+
 # ------------------------------------------------------------------
-# Bayes Calibration Reports
+# Historical backtest reports
 # ------------------------------------------------------------------
 
 @router.get("/calibration/reports", response_class=HTMLResponse)
 async def calibration_reports(
     request: Request,
-    start_date: str = "2025-01-01",
-    end_date: str = "2025-06-30",
+    start_date: str = DEFAULT_BACKTEST_START_DATE,
+    end_date: str = DEFAULT_BACKTEST_END_DATE,
     symbols: str = "300750,600519",
 ):
     from datetime import date as dt_date

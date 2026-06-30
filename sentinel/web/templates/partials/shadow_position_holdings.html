@@ -1,0 +1,125 @@
+<div class="grid gap-3">
+  {% if message %}
+  <div class="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-bold text-green-700">
+    {{ message }}
+  </div>
+  {% endif %}
+
+  {% if refresh_result %}
+  <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+    <span class="font-bold">已刷新 {{ refresh_result.updated_count }} 个影子持仓</span>
+    <span class="ml-2 mono text-xs">source={{ refresh_result.source }}</span>
+    {% if refresh_result.failures %}
+    <div class="mt-2 grid gap-1 text-xs text-red-700">
+      {% for failure in refresh_result.failures %}
+      <div>{{ failure.symbol }} {{ failure.name }}: {{ failure.reason }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-2" id="shadow-risk-status">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="text-sm font-black text-slate-800">影子风控</div>
+      <span class="text-xs text-slate-500">随影子持仓刷新，不做独立轮询</span>
+    </div>
+    {% include "partials/risk_alert_banner.html" %}
+  </div>
+
+  {% if holdings %}
+  <div class="overflow-x-auto">
+    <table class="terminal-table">
+      <thead>
+        <tr>
+          <th>标的</th>
+          <th>行业</th>
+          <th>仓位</th>
+          <th>成本价</th>
+          <th>当前</th>
+          <th>最高</th>
+          <th>浮盈</th>
+          <th>回撤</th>
+          <th>风控</th>
+          <th>Kelly</th>
+          <th>赔率</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for holding in holdings %}
+        {% set pnl = (holding.current_price / holding.entry_price - 1.0) if holding.entry_price else 0.0 %}
+        {% set drawdown = (holding.current_price / holding.highest_price - 1.0) if holding.highest_price else 0.0 %}
+        {% set hard_limit = holding.get("stop_loss_hard", -0.20) %}
+        {% set trailing_limit = holding.get("stop_loss_trailing", -0.15) %}
+        {% set hard_triggered = holding.current_price <= holding.entry_price * (1.0 + hard_limit) %}
+        {% set trailing_triggered = holding.current_price <= holding.highest_price * (1.0 + trailing_limit) %}
+        <tr>
+          <td>{{ holding.name }} <span class="mono text-slate-500">{{ holding.symbol }}</span></td>
+          <td>{{ holding.sector or "未分组" }}</td>
+          <td class="mono font-bold">{{ "%.0f"|format(holding.weight * 100) }}%</td>
+          <td>
+            <form class="control-row"
+                  hx-post="/api/shadow-positions/{{ holding.symbol }}/cost"
+                  hx-target="#shadow-position-holdings"
+                  hx-swap="innerHTML">
+              <input name="entry_price"
+                     class="ws-input mono w-24"
+                     type="number"
+                     min="0.01"
+                     step="0.01"
+                     value="{{ "%.2f"|format(holding.entry_price) }}">
+              <button type="submit" class="icon-button" title="更新成本价" aria-label="更新成本价">
+                <i data-lucide="save" class="w-4 h-4"></i>
+              </button>
+            </form>
+          </td>
+          <td class="mono">{{ "%.2f"|format(holding.current_price) }}</td>
+          <td class="mono">{{ "%.2f"|format(holding.highest_price) }}</td>
+          <td class="mono font-bold {% if pnl < 0 %}score-danger{% else %}score-positive{% endif %}">
+            {{ "%+.1f"|format(pnl * 100) }}%
+          </td>
+          <td class="mono font-bold {% if drawdown <= trailing_limit %}score-danger{% elif drawdown < 0 %}score-warning{% else %}score-positive{% endif %}">
+            {{ "%+.1f"|format(drawdown * 100) }}%
+          </td>
+          <td>
+            {% if hard_triggered %}
+            <span class="status-chip warn">硬止损</span>
+            {% elif trailing_triggered %}
+            <span class="status-chip warn">追踪止损</span>
+            {% else %}
+            <span class="status-chip good">正常</span>
+            {% endif %}
+          </td>
+          <td class="mono">{{ "%.0f"|format((holding.kelly_fraction or holding.weight) * 100) }}%</td>
+          <td class="mono">{{ "%.1f"|format(holding.payoff_ratio or 0) }}</td>
+          <td>
+            <button type="button"
+                    class="icon-button"
+                    title="删除影子持仓"
+                    aria-label="删除影子持仓"
+                    hx-post="/api/shadow-positions/{{ holding.symbol }}/delete"
+                    hx-confirm="删除 {{ holding.name }} 的影子持仓？"
+                    hx-target="#shadow-position-holdings"
+                    hx-swap="innerHTML">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state min-h-[120px]">
+    <div>
+      <i data-lucide="briefcase-business" class="w-7 h-7 mx-auto mb-2 text-slate-400"></i>
+      <div class="font-semibold text-slate-700">暂无影子持仓</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  if (window.lucide) window.lucide.createIcons();
+</script>

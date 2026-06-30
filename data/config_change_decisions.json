@@ -3,5 +3,41 @@
     "875154c5fa58": "approved",
     "b03505679944": "approved",
     "6c609bb3c41f": "approved"
+  },
+  "queued_proposals": {
+    "a91556892ecc": {
+      "id": "a91556892ecc",
+      "action": "add",
+      "title": "添加政策复核项: 政策白名单",
+      "config_file": "policy_whitelist.yaml",
+      "path": "review_queue.7fab24ea7338",
+      "current_value": null,
+      "proposed_value": {
+        "source": "daily_research_agent",
+        "suggestion_id": "7fab24ea7338",
+        "title": "政策白名单需要复核",
+        "target": "政策白名单",
+        "rationale": "政策白名单距离上次更新已有 45 天，超过 21 天复核窗口。",
+        "proposed_change": "先查看近期政策、财报和产业链变化，再决定是否在配置控制台调整对应规则。",
+        "confidence": 0.86,
+        "impact": "中",
+        "evidence": [
+          {
+            "source": "本地配置",
+            "title": "更新时间检查",
+            "detail": "policy_whitelist.yaml last_updated=2026-05-15，距今天 45 天"
+          }
+        ],
+        "counter_evidence": [
+          {
+            "source": "反向证据",
+            "title": "陈旧不等于失效",
+            "detail": "配置时间较旧只说明需要复核，不能单独证明原假设已经错误。"
+          }
+        ]
+      },
+      "rationale": "来自每日研究 Agent：政策白名单距离上次更新已有 45 天，超过 21 天复核窗口。确认后只加入 YAML review_queue，不直接改评分、倍率或白名单结论。",
+      "status": "pending"
+    }
   }
 }

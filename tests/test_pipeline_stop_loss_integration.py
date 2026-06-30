@@ -43,6 +43,29 @@ def test_pipeline_core_calls_stop_loss_monitor_after_scan():
                 svc = PipelineService()
                 batch_id = svc.create_batch()
 
+                with patch.object(svc, "_refresh_shadow_positions"):
+                    with patch.object(svc, "_run_stop_loss_scan") as mock_scan:
+                        svc._execute_pipeline_core(batch_id)
+                        mock_scan.assert_called_once()
+
+
+def test_pipeline_core_refreshes_shadow_positions_after_scan():
+    """Pipeline completion should refresh shadow holdings with pipeline source."""
+    with patch("sentinel.web.services.pipeline_service._get_repository") as mock_repo:
+        repo = MagicMock()
+        repo.list_pipeline_batches.return_value = []
+        repo.get_pipeline_results.return_value = []
+        mock_repo.return_value = repo
+
+        with patch("sentinel.web.services.pipeline_service.get_orchestrator") as mock_orch:
+            orch = MagicMock()
+            mock_orch.return_value = orch
+
+            svc = PipelineService()
+            batch_id = svc.create_batch()
+
+            with patch.object(svc, "_refresh_shadow_positions") as mock_refresh:
                 with patch.object(svc, "_run_stop_loss_scan") as mock_scan:
                     svc._execute_pipeline_core(batch_id)
+                    mock_refresh.assert_called_once_with(source="pipeline")
                     mock_scan.assert_called_once()

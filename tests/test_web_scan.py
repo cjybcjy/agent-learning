@@ -75,6 +75,25 @@ def test_candidate_discovery_route_renders_objective_evidence():
     service_cls.return_value.discover_theme.assert_called_once_with("Embodied_Robotics")
 
 
+def test_candidate_discovery_route_can_start_scan_mode():
+    client = TestClient(create_app())
+    with patch("sentinel.web.routers.research.run_scan_task") as mock_run:
+        response = client.post(
+            "/api/candidates/discover",
+            data={
+                "theme": "Self_Reliant_Semiconductors",
+                "roles": "upstream",
+                "fund_rank_limit": "20",
+                "discovery_mode": "scan",
+            },
+        )
+
+    assert response.status_code == 200
+    assert "scan-task-id" in response.text
+    assert mock_run.call_args.args[2] == ["upstream"]
+    assert mock_run.call_args.args[4] == 20
+
+
 def test_candidate_discovery_route_handles_missing_theme_visibly():
     client = TestClient(create_app())
 

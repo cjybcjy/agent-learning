@@ -60,10 +60,38 @@ CREATE TABLE IF NOT EXISTS mgfs_active_holdings (
     current_price DOUBLE NOT NULL,
     highest_price DOUBLE NOT NULL,
     weight DOUBLE NOT NULL,
+    kelly_fraction DOUBLE NOT NULL DEFAULT 0.0,
+    win_prob DOUBLE NOT NULL DEFAULT 0.0,
+    payoff_ratio DOUBLE NOT NULL DEFAULT 0.0,
     entry_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     stop_loss_hard DOUBLE NOT NULL,
     stop_loss_trailing DOUBLE NOT NULL,
     portfolio_stop_loss DOUBLE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS mgfs_shadow_position_snapshots (
+    snapshot_id VARCHAR(64) PRIMARY KEY,
+    symbol VARCHAR(16) NOT NULL,
+    name VARCHAR(32) NOT NULL,
+    sector VARCHAR(50),
+    entry_price DOUBLE NOT NULL,
+    current_price DOUBLE NOT NULL,
+    highest_price DOUBLE NOT NULL,
+    weight DOUBLE NOT NULL,
+    kelly_fraction DOUBLE NOT NULL,
+    win_prob DOUBLE NOT NULL,
+    payoff_ratio DOUBLE NOT NULL,
+    unrealized_return DOUBLE NOT NULL,
+    drawdown_from_entry DOUBLE NOT NULL,
+    drawdown_from_high DOUBLE NOT NULL,
+    stop_loss_hard DOUBLE NOT NULL,
+    stop_loss_trailing DOUBLE NOT NULL,
+    portfolio_stop_loss DOUBLE NOT NULL,
+    hard_stop_triggered BOOLEAN NOT NULL,
+    trailing_stop_triggered BOOLEAN NOT NULL,
+    portfolio_stop_triggered BOOLEAN NOT NULL,
+    refresh_source VARCHAR(16) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 """
 
@@ -76,8 +104,19 @@ class MGFSRepository:
         con = self.database.connect()
         try:
             con.execute(SCHEMA_SQL)
+            self._ensure_active_holding_columns(con)
         finally:
             con.close()
+
+    @staticmethod
+    def _ensure_active_holding_columns(con: Any) -> None:
+        rows = con.execute("PRAGMA table_info('mgfs_active_holdings')").fetchall()
+        existing = {row[1] for row in rows}
+        for name in ("kelly_fraction", "win_prob", "payoff_ratio"):
+            if name not in existing:
+                con.execute(
+                    f"ALTER TABLE mgfs_active_holdings ADD COLUMN {name} DOUBLE DEFAULT 0.0"
+                )
 
     def save_decision(self, decision: InvestmentDecision) -> None:
         con = self.database.connect()
@@ -288,15 +327,22 @@ class MGFSRepository:
         stop_loss_hard: float,
         stop_loss_trailing: float,
         portfolio_stop_loss: float,
+        kelly_fraction: float | None = None,
+        win_prob: float | None = None,
+        payoff_ratio: float | None = None,
     ) -> None:
+        kelly_fraction = weight if kelly_fraction is None else kelly_fraction
+        win_prob = 0.0 if win_prob is None else win_prob
+        payoff_ratio = 0.0 if payoff_ratio is None else payoff_ratio
         con = self.database.connect()
         try:
             con.execute(
                 """
                 INSERT INTO mgfs_active_holdings
                 (symbol, name, sector, entry_price, current_price, highest_price,
-                 weight, stop_loss_hard, stop_loss_trailing, portfolio_stop_loss)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 weight, kelly_fraction, win_prob, payoff_ratio,
+                 stop_loss_hard, stop_loss_trailing, portfolio_stop_loss)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (symbol) DO UPDATE SET
                     name = excluded.name,
                     sector = excluded.sector,
@@ -307,14 +353,17 @@ class MGFSRepository:
                         ELSE excluded.highest_price
                     END,
                     weight = excluded.weight,
+                    kelly_fraction = excluded.kelly_fraction,
+                    win_prob = excluded.win_prob,
+                    payoff_ratio = excluded.payoff_ratio,
                     stop_loss_hard = excluded.stop_loss_hard,
                     stop_loss_trailing = excluded.stop_loss_trailing,
                     portfolio_stop_loss = excluded.portfolio_stop_loss
                 """,
                 [
                     symbol, name, sector, entry_price, current_price,
-                    highest_price, weight, stop_loss_hard,
-                    stop_loss_trailing, portfolio_stop_loss,
+                    highest_price, weight, kelly_fraction, win_prob, payoff_ratio,
+                    stop_loss_hard, stop_loss_trailing, portfolio_stop_loss,
                 ],
             )
         finally:
@@ -335,6 +384,21 @@ class MGFSRepository:
                 WHERE symbol = ?
                 """,
                 [current_price, current_price, current_price, symbol],
+            )
+        finally:
+            con.close()
+
+    def update_holding_cost(self, symbol: str, entry_price: float) -> None:
+        """Update the manually entered cost basis without changing market price."""
+        con = self.database.connect()
+        try:
+            con.execute(
+                """
+                UPDATE mgfs_active_holdings
+                SET entry_price = ?
+                WHERE symbol = ?
+                """,
+                [entry_price, symbol],
             )
         finally:
             con.close()
@@ -373,6 +437,88 @@ class MGFSRepository:
                 """,
                 [new_price, new_price, symbol],
             )
+        finally:
+            con.close()
+
+    def save_shadow_position_snapshot(
+        self,
+        *,
+        snapshot_id: str,
+        symbol: str,
+        name: str,
+        sector: str | None,
+        entry_price: float,
+        current_price: float,
+        highest_price: float,
+        weight: float,
+        kelly_fraction: float,
+        win_prob: float,
+        payoff_ratio: float,
+        unrealized_return: float,
+        drawdown_from_entry: float,
+        drawdown_from_high: float,
+        stop_loss_hard: float,
+        stop_loss_trailing: float,
+        portfolio_stop_loss: float,
+        hard_stop_triggered: bool,
+        trailing_stop_triggered: bool,
+        portfolio_stop_triggered: bool,
+        refresh_source: str,
+    ) -> None:
+        con = self.database.connect()
+        try:
+            con.execute(
+                """
+                INSERT INTO mgfs_shadow_position_snapshots
+                (snapshot_id, symbol, name, sector, entry_price, current_price,
+                 highest_price, weight, kelly_fraction, win_prob, payoff_ratio,
+                 unrealized_return, drawdown_from_entry, drawdown_from_high,
+                 stop_loss_hard, stop_loss_trailing, portfolio_stop_loss,
+                 hard_stop_triggered, trailing_stop_triggered,
+                 portfolio_stop_triggered, refresh_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    snapshot_id, symbol, name, sector, entry_price, current_price,
+                    highest_price, weight, kelly_fraction, win_prob, payoff_ratio,
+                    unrealized_return, drawdown_from_entry, drawdown_from_high,
+                    stop_loss_hard, stop_loss_trailing, portfolio_stop_loss,
+                    hard_stop_triggered, trailing_stop_triggered,
+                    portfolio_stop_triggered, refresh_source,
+                ],
+            )
+        finally:
+            con.close()
+
+    def list_shadow_position_snapshots(
+        self,
+        *,
+        symbol: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        con = self.database.connect()
+        try:
+            if symbol:
+                rows = con.execute(
+                    """
+                    SELECT * FROM mgfs_shadow_position_snapshots
+                    WHERE symbol = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    [symbol, limit],
+                ).fetchall()
+            else:
+                rows = con.execute(
+                    """
+                    SELECT * FROM mgfs_shadow_position_snapshots
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    [limit],
+                ).fetchall()
+            columns = [desc[0] for desc in con.description]
+            return [dict(zip(columns, row)) for row in rows]
         finally:
             con.close()
 

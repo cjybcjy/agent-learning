@@ -12,15 +12,16 @@ TradingAgents 的 LangChain/LLM 依赖混入 MGFS 主运行环境。
 ## 启动方式
 
 ```bash
-TRADINGAGENTS_PYTHON=/home/kyrie/workspace/agent-learning/.venv-tradingagents/bin/python \
 TRADINGAGENTS_OUTPUT_LANGUAGE=Chinese \
 TRADINGAGENTS_TIMEOUT_SECONDS=120 \
 PYTHONPATH=. \
 uvicorn sentinel.web.main:app --host 127.0.0.1 --port 8000
 ```
 
-`TRADINGAGENTS_PYTHON` 存在时，页面上的“基本面建议”会走隔离环境。
-如果不设置，本项目会尝试在主 Python 环境中直接 import `tradingagents`。
+默认情况下，页面上的“基本面建议”会自动发现并使用
+`.venv-tradingagents/bin/python`。如果需要改用其他隔离环境，可以显式设置
+`TRADINGAGENTS_PYTHON`；只有在没有可用隔离环境时，本项目才会尝试在主 Python
+环境中直接 import `tradingagents`。
 
 ## Provider 配置
 

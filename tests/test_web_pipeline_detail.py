@@ -32,6 +32,8 @@ def test_pipeline_detail_returns_table_with_results():
         assert "000001" in html
         # Detail table container should exist
         assert "pipeline-detail-table" in html
+        assert 'hx-post="/api/paper_trade"' not in html
+        assert '"weight": 0.2' not in html
 
 
 def test_pipeline_detail_empty_results_shows_message():

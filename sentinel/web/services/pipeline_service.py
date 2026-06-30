@@ -94,6 +94,27 @@ class PipelineService:
         except Exception:
             logger.exception("Stop-loss scan failed")
 
+    def _refresh_shadow_positions(self, *, source: str) -> None:
+        """Refresh shadow holding prices and write optimization snapshots."""
+        try:
+            from sentinel.web.services.shadow_position_service import (
+                ShadowPositionSimulatorService,
+            )
+
+            result = ShadowPositionSimulatorService(
+                repository=self.repository
+            ).refresh_active_holdings(source=source)
+            if result.failures:
+                for failure in result.failures:
+                    logger.warning(
+                        "Shadow position refresh failed for %s %s: %s",
+                        failure.symbol,
+                        failure.name,
+                        failure.reason,
+                    )
+        except Exception:
+            logger.exception("Shadow position refresh failed")
+
     def export_csv(self, batch_id: str) -> str:
         output = io.StringIO()
         writer = csv.writer(output)
@@ -191,6 +212,7 @@ class PipelineService:
                 total_count=len(targets),
                 strong_buy_count=strong_buy_count,
             )
+            self._refresh_shadow_positions(source="pipeline")
             self._run_stop_loss_scan()
         except Exception as exc:
             logger.exception("Pipeline execution failed for batch %s", batch_id)

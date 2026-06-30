@@ -67,3 +67,31 @@ def test_all_sources_failed_raises_runtime_error() -> None:
 def test_default_chain_returns_multi_source() -> None:
     fetcher = MultiSourceFetcher.default_chain()
     assert isinstance(fetcher, MultiSourceFetcher)
+
+
+def test_default_chain_accepts_fast_network_options() -> None:
+    fetcher = MultiSourceFetcher.default_chain(
+        request_timeout=2.5,
+        max_retries=1,
+        delay_scale=0.0,
+    )
+
+    eastmoney_sources = [
+        source
+        for source in fetcher._sources
+        if source.__class__.__name__ == "EastmoneyKlineFetcher"
+    ]
+    if eastmoney_sources:
+        assert eastmoney_sources[0]._request_timeout == 2.5
+        assert eastmoney_sources[0]._max_retries == 1
+        assert eastmoney_sources[0]._delay_scale == 0.0
+
+    adapter_sources = [
+        source
+        for source in fetcher._sources
+        if hasattr(source, "_adapter")
+    ]
+    assert adapter_sources
+    for source in adapter_sources:
+        assert source._adapter._request_timeout == 2.5
+        assert source._adapter._delay_scale == 0.0

@@ -2,36 +2,74 @@
 {% block content %}
 
 <div class="workstation-layout-relaxed">
-  <section class="workflow-guide">
-    <div class="workflow-guide-header">
-      <div class="workflow-guide-title">
-        <i data-lucide="route" class="w-4 h-4"></i>
-        工作流导览
+  <section class="workflow-guide logic-map">
+    <div class="logic-map-header">
+      <div class="logic-map-title">
+        <i data-lucide="git-branch" class="w-4 h-4"></i>
+        MGFS 分层链路
       </div>
-      <div class="workflow-guide-caption">按顺序完成一次投研闭环</div>
+      <div class="logic-map-caption">把一次投研拆成输入、并行因子、门槛和执行观察</div>
     </div>
-    <nav class="workflow-steps" aria-label="MGFS 投研工作流">
-      <a class="workflow-step" href="#opportunity-radar">
-        <span class="workflow-step-title">1 发现机会</span>
-        <span class="workflow-step-note">单票评估或主题扫描</span>
+    <nav class="logic-flow-track research-flow" aria-label="MGFS 投研工作流">
+      <a class="logic-node workflow-step" href="#opportunity-radar">
+        <span class="logic-node-index">01</span>
+        <span class="logic-node-title workflow-step-title">1 发现机会</span>
+        <span class="logic-node-copy workflow-step-note">单票评估或主题扫描，把股票代码、市场、主题和角色约束转成 TargetInfo。</span>
+        <span class="logic-node-meta">
+          <span>输入: symbol / theme / policy</span>
+          <span>输出: 候选标的或评估请求</span>
+        </span>
       </a>
-      <a class="workflow-step" href="#decision-ticket">
-        <span class="workflow-step-title">2 查看决策</span>
-        <span class="workflow-step-note">评分、评级和建议动作</span>
+      <a class="logic-node workflow-step" href="#decision-ticket">
+        <span class="logic-node-index">02</span>
+        <span class="logic-node-title workflow-step-title">2 查看决策</span>
+        <span class="logic-node-copy workflow-step-note">护城河、政策、估值、择时并行打分，再汇总成 InvestmentDecision。</span>
+        <span class="logic-node-meta">
+          <span>判断: 因子权重 + 置信度</span>
+          <span>输出: 评级、动作、证据缺口</span>
+        </span>
       </a>
-      <a class="workflow-step" href="#position-dock">
-        <span class="workflow-step-title">3 加入影子持仓</span>
-        <span class="workflow-step-note">跟踪买入信号和仓位</span>
+      <a class="logic-node workflow-step" href="#position-dock">
+        <span class="logic-node-index">03</span>
+        <span class="logic-node-title workflow-step-title">3 加入影子持仓</span>
+        <span class="logic-node-copy workflow-step-note">只有达到门槛的票据进入影子观察，不触发真实交易。</span>
+        <span class="logic-node-meta">
+          <span>边界: Shadow Trading</span>
+          <span>输出: active_holding</span>
+        </span>
       </a>
-      <a class="workflow-step" href="#risk-console">
-        <span class="workflow-step-title">4 处理风控</span>
-        <span class="workflow-step-note">清仓、重置或继续观察</span>
-      </a>
-      <a class="workflow-step" href="#calibration-lab">
-        <span class="workflow-step-title">5 复盘校准</span>
-        <span class="workflow-step-note">修正静态评分偏见</span>
+      <a class="logic-node workflow-step" href="#position-dock">
+        <span class="logic-node-index">04</span>
+        <span class="logic-node-title workflow-step-title">4 处理风控</span>
+        <span class="logic-node-copy workflow-step-note">止损监控读取影子持仓，触发硬止损、追踪止损或组合警报。</span>
+        <span class="logic-node-meta">
+          <span>判断: entry / high / current</span>
+          <span>输出: 风险警报</span>
+        </span>
       </a>
     </nav>
+    <div class="logic-layer-grid">
+      <div class="logic-layer">
+        <div class="logic-layer-title">
+          <i data-lucide="workflow" class="w-4 h-4"></i>
+          因子并行层
+        </div>
+        <div class="logic-chip-row">
+          <span class="logic-chip good">护城河</span>
+          <span class="logic-chip info">政策</span>
+          <span class="logic-chip warn">估值</span>
+          <span class="logic-chip">择时</span>
+        </div>
+        <div class="logic-layer-copy">四个插件独立产出 FactorScore，编排器只负责加权、置信度和门槛。</div>
+      </div>
+      <div class="logic-layer">
+        <div class="logic-layer-title">
+          <i data-lucide="shield-check" class="w-4 h-4"></i>
+          决策保护层
+        </div>
+        <div class="logic-boundary">熔断规则和 Strong Buy 证据门槛优先于总分，低置信度不会被权重重分配悄悄抬高。</div>
+      </div>
+    </div>
   </section>
 
   <section id="score-composition-config" class="workstation-panel">
@@ -159,8 +197,9 @@
         <div id="eval-loading" class="htmx-indicator text-sm text-blue-200 mb-5">评估中，请稍候...</div>
 
         <div class="border-t border-slate-700 pt-5">
-          <form hx-post="/api/scan/start"
-                hx-target="#scan-started"
+          <form id="candidate-discovery-form"
+                hx-post="/api/candidates/discover"
+                hx-target="#candidate-discovery-result"
                 hx-swap="innerHTML">
             <div class="control-row">
               <select id="scan-theme" name="theme" required class="ws-select flex-1 min-w-[240px]">
@@ -168,6 +207,10 @@
                 {% for theme in macro_themes %}
                 <option value="{{ theme.key }}">{{ theme.label }}</option>
                 {% endfor %}
+              </select>
+              <select name="discovery_mode" class="ws-select flex-1 min-w-[150px]" aria-label="发现方式">
+                <option value="objective">板块成分股</option>
+                <option value="scan">评分扫描</option>
               </select>
               <input name="roles" placeholder="角色过滤"
                      class="ws-input flex-1 min-w-[170px]">
@@ -182,28 +225,20 @@
                 <option value="20">重仓基金数量排名 Top 20</option>
                 <option value="50">重仓基金数量排名 Top 50</option>
               </select>
-              <button type="submit" class="ws-button success">
+              <button type="submit"
+                      class="ws-button success"
+                      hx-include="#candidate-discovery-form"
+                      hx-indicator="#candidate-discovery-loading">
                 <i data-lucide="scan-search" class="w-4 h-4"></i>
-                启动扫描
-              </button>
-              <button type="button"
-                      hx-post="/api/candidates/discover"
-                      hx-include="#scan-theme"
-                      hx-target="#candidate-discovery-result"
-                      hx-swap="innerHTML"
-                      hx-indicator="#candidate-discovery-loading"
-                      class="ws-button ghost">
-                <i data-lucide="radar" class="w-4 h-4"></i>
-                客观发现
+                发现候选
               </button>
               <span id="candidate-discovery-loading" class="htmx-indicator text-xs text-blue-200">
-                客观发现中...
+                发现候选中...
               </span>
             </div>
           </form>
 
           <div id="candidate-discovery-result"></div>
-          <div id="scan-started"></div>
 
           <div id="scan-progress" class="mt-4 hidden">
             <div class="flex flex-wrap items-center gap-3">
@@ -240,27 +275,6 @@
   </section>
 
   <section class="secondary-workflow">
-    <section id="risk-console" class="workstation-panel risk-console-panel wide-panel">
-      <div class="panel-header">
-        <div class="panel-title">
-          <i data-lucide="shield-alert" class="w-4 h-4"></i>
-          组合风控
-        </div>
-        <span class="panel-caption">Risk Console</span>
-      </div>
-      <div class="panel-body">
-        <div hx-get="/api/risk/alerts"
-             hx-trigger="load, every 10s"
-             hx-target="this"
-             hx-swap="outerHTML">
-          <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-2 text-sm text-slate-500">
-            <i data-lucide="shield" class="w-4 h-4"></i>
-            <span>风控状态加载中...</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <section id="position-dock" class="workstation-panel">
       <div class="panel-header">
         <div class="panel-title">
@@ -269,23 +283,14 @@
         </div>
         <span class="panel-caption">Position Dock</span>
       </div>
-      <div class="panel-body">
-        <div class="metric-strip">
-          <div class="metric-tile">
-            <div class="metric-label">仓位引擎</div>
-            <div class="metric-value">Kelly</div>
-          </div>
-          <div class="metric-tile">
-            <div class="metric-label">行业上限</div>
-            <div class="metric-value">Clip</div>
-          </div>
-          <div class="metric-tile">
-            <div class="metric-label">止损</div>
-            <div class="metric-value">Auto</div>
-          </div>
-        </div>
-        <div class="rounded-md border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-blue-900 leading-relaxed">
-          Strong Buy 和 Accumulate 票据会提供影子持仓动作，并纳入风控轮询。
+      <div id="shadow-position-dock-content"
+           class="panel-body"
+           hx-get="/api/shadow-positions/panel"
+           hx-trigger="load"
+           hx-swap="innerHTML">
+        <div class="rounded-md border border-blue-100 bg-blue-50 px-4 py-3 flex items-center gap-2 text-sm text-blue-700">
+          <i data-lucide="loader-circle" class="w-4 h-4"></i>
+          <span>Kelly 影子持仓加载中...</span>
         </div>
       </div>
     </section>
@@ -309,29 +314,6 @@
         </div>
       </div>
     </section>
-
-    <div id="calibration-lab"
-         class="wide-panel"
-         hx-get="/api/calibration/reports"
-         hx-trigger="load"
-         hx-target="this"
-         hx-swap="outerHTML">
-      <section class="workstation-panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <i data-lucide="brain-circuit" class="w-4 h-4"></i>
-            贝叶斯校准
-          </div>
-          <span class="panel-caption">Calibration</span>
-        </div>
-        <div class="panel-body">
-          <div class="rounded-md border border-purple-100 bg-purple-50 px-4 py-3 flex items-center gap-2 text-sm text-purple-600">
-            <i data-lucide="loader-circle" class="w-4 h-4"></i>
-            <span>贝叶斯校准报告加载中...</span>
-          </div>
-        </div>
-      </section>
-    </div>
   </section>
 </div>
 
